@@ -1,2 +1,4 @@
 .venv/
 from_github_maxar_metadata/
+*.png
+*.tif
