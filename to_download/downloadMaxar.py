@@ -21,8 +21,9 @@ def get_pre_post_gdf_local(collection_id, event2date = event2date, local_gdf = T
         return None, None
 
     #Create the geodataframe
+    geojson_path = '/mnt/data2/vaschetti_data/maxar/metadata/from_github/datasets'
     if local_gdf:
-        gdf = gpd.read_file(os.path.join('from_github_maxar_metadata/datasets/', collection_id + '.geojson'))
+        gdf = gpd.read_file(os.path.join(geojson_path, collection_id + '.geojson'))
     else:
         gdf = gpd.GeoDataFrame()
         for child_id in tqdm(leafmap.maxar_child_collections(collection_id)):
