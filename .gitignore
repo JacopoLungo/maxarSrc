@@ -4,3 +4,9 @@ from_github_maxar_metadata/
 *.tif
 *.pyc
 *.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.xml
+*.cpg
