@@ -77,7 +77,7 @@ class MyGridGeoSampler(GridGeoSampler):
             (minx, maxx, miny, maxy, mint, maxt) coordinates to index a dataset
         """
         # For each tile...
-        for hit in self.hits:
+        for hit in self.hits: #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
             tile_path = hit.object
             tile_polygon = path_2_tilePolygon(tile_path)
 
