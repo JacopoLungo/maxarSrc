@@ -11,3 +11,4 @@ from_github_maxar_metadata/
 *.xml
 *.cpg
 *.pth
+*.tsv
