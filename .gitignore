@@ -10,3 +10,4 @@ from_github_maxar_metadata/
 *.prj
 *.xml
 *.cpg
+*.pth
