@@ -111,7 +111,7 @@ def rmv_pts_out_img(points: np.array, sample_size):
     points = points[np.logical_and(np.logical_and(points[:, 0] >= 0, points[:, 0] <= sample_size), np.logical_and(points[:, 1] >= 0, points[:, 1] <= sample_size))]
     return points
 
-def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50):
+def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50, clean_mask = True):
     predictor.set_image(img4Sam)
     
     final_mask = np.full((sample_size, sample_size), False)
@@ -155,8 +155,8 @@ def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist =
             
 
             final_mask = np.logical_or(final_mask, mask[0])
-            
-    #adj_final_mask = clear_mask(road_lines, final_mask, offset_distance)
+    if clean_mask:
+        final_mask = clear_mask(road_lines, final_mask, offset_distance - 10)        
     return final_mask[np.newaxis, :], np.array(final_pt_coords4Sam), np.array(final_labels4Sam)
 
 
