@@ -1,6 +1,8 @@
 from shapely.geometry import Polygon, LineString, MultiPoint
 import geopandas as gpd
 import numpy as np
+from rasterio.features import rasterize
+from skimage import morphology
 
 def rel_road_lines(geodf: gpd.GeoDataFrame,
                     query_bbox_poly: Polygon,
@@ -111,7 +113,7 @@ def rmv_pts_out_img(points: np.array, sample_size):
     points = points[np.logical_and(np.logical_and(points[:, 0] >= 0, points[:, 0] <= sample_size), np.logical_and(points[:, 1] >= 0, points[:, 1] <= sample_size))]
     return points
 
-def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50, clean_mask = True):
+def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50, do_clean_mask = True):
     predictor.set_image(img4Sam)
     
     final_mask = np.full((sample_size, sample_size), False)
@@ -155,29 +157,19 @@ def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist =
             
 
             final_mask = np.logical_or(final_mask, mask[0])
-    if clean_mask:
-        final_mask = clear_mask(road_lines, final_mask, offset_distance - 10)        
+    if do_clean_mask:
+        final_mask = clean_mask(road_lines, final_mask, offset_distance - 10) #TODO: eventualmente aggiungere un parametro per l'additional_cleaning       
     return final_mask[np.newaxis, :], np.array(final_pt_coords4Sam), np.array(final_labels4Sam)
-
-
-def clear_mask(road_lines, final_mask, offset_distance):
     
-    all_true_pts = [(y,x) for x,y in zip(*np.where(final_mask))] #tutti i punti della mask final predetti come true
-    all_true_multipoints = MultiPoint(all_true_pts)
+def clean_mask(road_lines, final_mask_2d, offset_distance, additional_cleaning = False):
 
-    for i, line in enumerate(road_lines):
-        if i == 0:
-            gbl_line_space = line.buffer(offset_distance)
-        else:
-            gbl_line_space = gbl_line_space.union(line.buffer(offset_distance))
+    line_buffers = [line.buffer(offset_distance) for line in road_lines]
+    buffer_roads = rasterize(line_buffers, out_shape=final_mask_2d.shape)
+    clear_mask = np.logical_and(final_mask_2d, buffer_roads)
+    if additional_cleaning: #TODO: controllare meglio cosa fanno queste funzioni e tunare i parametri
+        clear_mask = morphology.remove_small_holes(clear_mask, area_threshold=500)
+        clear_mask = morphology.remove_small_objects(clear_mask, min_size=500)
+        clear_mask = morphology.binary_opening(clear_mask)
+        clear_mask = morphology.binary_closing(clear_mask)
     
-    #Seleziono tutti i punti che sono true e sono dentro gbl_line_space
-
-    cleaned_true = all_true_multipoints.intersection(gbl_line_space)
-    pt_set_false = all_true_multipoints - cleaned_true
-    for pt in pt_set_false.geoms:
-        final_mask[int(pt.coords[0][1]), int(pt.coords[0][0])] = False
-    
-    return final_mask
-    
-
+    return clear_mask
