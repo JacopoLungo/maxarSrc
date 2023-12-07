@@ -3,6 +3,7 @@ import geopandas as gpd
 import numpy as np
 from rasterio.features import rasterize
 from skimage import morphology
+import matplotlib.pyplot as plt
 
 def rel_road_lines(geodf: gpd.GeoDataFrame,
                     query_bbox_poly: Polygon,
@@ -110,32 +111,36 @@ def rmv_pts_out_img(points: np.array, sample_size):
     """
     Removes points outside the image
     """
-    points = points[np.logical_and(np.logical_and(points[:, 0] >= 0, points[:, 0] <= sample_size), np.logical_and(points[:, 1] >= 0, points[:, 1] <= sample_size))]
+    if len(points) != 0:
+        points = points[np.logical_and(np.logical_and(points[:, 0] >= 0, points[:, 0] < sample_size), np.logical_and(points[:, 1] >= 0, points[:, 1] < sample_size))]
     return points
 
-def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50, do_clean_mask = True):
-    predictor.set_image(img4Sam)
+def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist = 50, bg_point_dist = 80, offset_distance = 50, do_clean_mask = True, do_encoding = False):
+    #Decide if to do encoding or do it outside the function
+    if do_encoding:
+        predictor.set_image(img4Sam)
     
+    #initialize an empty mask
     final_mask = np.full((sample_size, sample_size), False)
     
     final_pt_coords4Sam = []
     final_labels4Sam = []
     
     for road in road_lines:
-        road_pts = line2points(road, road_point_dist)
-        
-        bg_lines = get_offset_lines(road, offset_distance)
-        bg_pts = line2points(bg_lines, bg_point_dist)
-
-        bg_pts = clear_roads(road_lines, bg_pts, offset_distance - 4)
-
-        np_roads_pts = np.array([list(pt.coords)[0] for pt in road_pts])
-        np_roads_pts = rmv_pts_out_img(np_roads_pts, sample_size)
+        road_pts = line2points(road, road_point_dist) #turn the road into a list of shapely points
+        np_roads_pts = np.array([list(pt.coords)[0] for pt in road_pts]) #turn the shapely points into a numpy array
+        np_roads_pts = rmv_pts_out_img(np_roads_pts, sample_size) #remove road points outside the image
         np_road_labels = np.array([1]*np_roads_pts.shape[0])
-
+        
+        bg_lines = get_offset_lines(road, offset_distance) #create two offset lines from the road
+        bg_pts = line2points(bg_lines, bg_point_dist) #turn the offset lines into a list of shapely points
+        bg_pts = clear_roads(road_lines, bg_pts, offset_distance - 4) #remove bg points that may be on other roads
         np_bg_pts = np.array([list(pt.coords)[0] for pt in bg_pts])
         np_bg_pts = rmv_pts_out_img(np_bg_pts, sample_size)
         np_bg_labels = np.array([0]*np_bg_pts.shape[0])
+
+        if len(np_bg_labels) == 0 or len(np_road_labels) < 2: #if there are no bg_points or 0 or 1 road points skip the road
+            continue
 
         pt_coords4Sam = np.concatenate((np_roads_pts, np_bg_pts))
         labels4Sam = np.concatenate((np_road_labels, np_bg_labels))
@@ -143,22 +148,16 @@ def segment_roads(predictor, img4Sam, road_lines, sample_size, road_point_dist =
         final_pt_coords4Sam.extend(pt_coords4Sam.tolist())
         final_labels4Sam.extend(labels4Sam.tolist())
 
+        mask, _, _ = predictor.predict(
+                point_coords=pt_coords4Sam,
+                point_labels=labels4Sam,
+                multimask_output=False,
+            )
+        final_mask = np.logical_or(final_mask, mask[0])
 
-        if len(pt_coords4Sam) == 0 or len(labels4Sam[labels4Sam==1]) < 1 : #if there are no points, one or zero road points
-            continue
-        
-        else:
-            mask, _, _ = predictor.predict(
-                    point_coords=pt_coords4Sam,
-                    point_labels=labels4Sam,
-                    multimask_output=False,
-                )
-            
-            
-
-            final_mask = np.logical_or(final_mask, mask[0])
     if do_clean_mask:
         final_mask = clean_mask(road_lines, final_mask, offset_distance - 10) #TODO: eventualmente aggiungere un parametro per l'additional_cleaning       
+    
     return final_mask[np.newaxis, :], np.array(final_pt_coords4Sam), np.array(final_labels4Sam)
     
 def clean_mask(road_lines, final_mask_2d, offset_distance, additional_cleaning = False):
