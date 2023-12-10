@@ -51,7 +51,7 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
         a list of tuples with the relative coordinates of the bboxes [(minx, miny, maxx, maxy), ...]
     """
     result = []
-    ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner
+    ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the square sample extracted from the tile
     #print('\nref_coords top left: ', ref_minx, ref_maxy )
     for geom in geodf['geometry']:
         building_minx, building_miny, building_maxx, building_maxy = geom.bounds
@@ -99,7 +99,7 @@ def segment_buildings(predictor, building_boxes, img4Sam, use_bbox = True, use_c
     The image has to be encoded the image before calling this function.
     Inputs:
         predictor: the predictor to use for the segmentation
-        building_boxes: a list of tuples containing the bounding boxes of the buildings in the image
+        building_boxes: a list of tuples containing the building's bounding boxes in formtat (minx, miny, maxx, maxy) = (top left corner, bottom right corner)
         img4Sam: the image previously encoded
         use_bbox: if True, the bounding boxes are used for the segmentation
         use_center_points: if True, the center points of the bounding boxes are used for the segmentation
