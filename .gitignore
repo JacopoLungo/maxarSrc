@@ -13,3 +13,4 @@ from_github_maxar_metadata/
 *.pth
 *.tsv
 *.jit
+*.pt
