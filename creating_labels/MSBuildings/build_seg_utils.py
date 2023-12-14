@@ -64,7 +64,7 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
         #print('After building_tuple: ', building_minx - ref_minx, ref_maxy - building_miny, building_maxx - ref_minx, ref_maxy - building_maxy)
         #reslut.append((building_minx - ref_minx, building_miny - ref_maxy, building_maxx - ref_minx, building_maxy - ref_maxy))
         #rel_bbox_coords = tuple(np.array([building_minx - ref_minx, building_miny - ref_maxy, building_maxx - ref_minx, building_maxy - ref_maxy]) / res)
-        rel_bbox_coords = tuple(np.array([building_minx - ref_minx, ref_maxy - building_maxy, building_maxx - ref_minx, ref_maxy - building_miny]) / res)
+        rel_bbox_coords = list(np.array([building_minx - ref_minx, ref_maxy - building_maxy, building_maxx - ref_minx, ref_maxy - building_miny]) / res)
         result.append(rel_bbox_coords)
     
     return result
