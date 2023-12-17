@@ -4,8 +4,8 @@ from shapely.geometry import shape, Polygon, LineString, MultiPoint, Point
 import os
 import sys
 sys.path.append('/home/vaschetti/maxarSrc/datasets_and_samplers')
-from myGeoDatasets import Maxar
-from mySamplers import MyGridGeoSampler
+from creating_labels.my_functions.geoDatasets import Maxar
+from creating_labels.my_functions.samplers import MyGridGeoSampler
 from torch.utils.data import DataLoader
 from torchgeo.datasets import stack_samples, unbind_samples
 from samplers_utils import boundingBox_2_Polygon
@@ -159,8 +159,8 @@ def segment_buildings(predictor, building_boxes, img4Sam: np.array, use_bbox = T
         used_boxes = building_boxes
 
     used_points = None
-    if use_center_points:
-        used_points = point_coords.cpu().numpy()
+    """if use_center_points:
+        used_points = point_coords.cpu().numpy()"""
 
     return mask, used_boxes, used_points #returns all the np array
 
