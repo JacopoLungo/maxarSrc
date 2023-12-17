@@ -4,11 +4,11 @@ from shapely.geometry import shape, Polygon, LineString, MultiPoint, Point
 import os
 import sys
 sys.path.append('/home/vaschetti/maxarSrc/datasets_and_samplers')
-from creating_labels.my_functions.geoDatasets import Maxar
-from creating_labels.my_functions.samplers import MyGridGeoSampler
+from my_functions.geoDatasets import Maxar
+from my_functions.samplers import MyGridGeoSampler
 from torch.utils.data import DataLoader
 from torchgeo.datasets import stack_samples, unbind_samples
-from samplers_utils import boundingBox_2_Polygon
+from my_functions.samplers_utils import boundingBox_2_Polygon
 import numpy as np
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -28,7 +28,7 @@ from typing import Union, List
 # Buildings
 #############
 
-def building_gdf(country, root = '', dataset_crs = None, quiet = False):
+def building_gdf(country, csv_root = '', dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.
@@ -39,7 +39,7 @@ def building_gdf(country, root = '', dataset_crs = None, quiet = False):
         dataset_crs: the crs in which to convert the coordinates of the buildings
         quiet: if True, it doesn't print anything
     """
-    dataset_links = pd.read_csv(os.path.join(root, 'dataset-links.csv'))
+    dataset_links = pd.read_csv(csv_root)
     country_links = dataset_links[dataset_links.Location == country]
     #TODO: eventualmente filtrare anche sul quadkey dell evento
     if not quiet:

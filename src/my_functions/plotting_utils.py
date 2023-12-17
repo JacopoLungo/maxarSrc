@@ -47,7 +47,7 @@ def show_points(coords: np.array, labels: np.array, ax, marker_size=75):
         ax: the axis on which to plot the points
         marker_size: the size of the markers
     """
-    if labels == None:
+    if labels is None:
         ax.scatter(coords[:, 0], coords[:, 1], color='b', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
     else:
         pos_points = coords[labels==1]
@@ -57,7 +57,7 @@ def show_points(coords: np.array, labels: np.array, ax, marker_size=75):
 
 def plotShapelyPoints(points: Union[List[Point], Point], ax, color = 'red', markersize = 5):
     """
-    #! non usare questo ma solo show_points
+    #! NON usare questo ma solo show_points
     Plots a single or a list of shapely points
     """
     

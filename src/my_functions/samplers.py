@@ -1,7 +1,7 @@
 from torchgeo.samplers.utils import get_random_bounding_box, tile_to_chips
 from torchgeo.samplers.single import RandomGeoSampler, GridGeoSampler
 from torchgeo.datasets import GeoDataset, BoundingBox
-from samplers_utils import path_2_tilePolygon, boundingBox_2_Polygon, boundingBox_2_centralPoint
+from my_functions.samplers_utils import path_2_tilePolygon, boundingBox_2_Polygon, boundingBox_2_centralPoint
 from torchgeo.samplers.constants import Units
 from typing import Optional, Union
 from collections.abc import Iterator

@@ -1,0 +1,19 @@
+region,link
+United States,https://usaminedroads.blob.core.windows.net/road-detections/USA.zip
+South America,https://usaminedroads.blob.core.windows.net/road-detections/SouthAmerica-Full.zip
+Caribbean Islands,https://usaminedroads.blob.core.windows.net/road-detections/CaribbeanIslands-Full.zip
+Middle East,https://usaminedroads.blob.core.windows.net/road-detections/MiddleEast-Full.zip
+Central Asia,https://usaminedroads.blob.core.windows.net/road-detections/AsiaCenter-Full.zip
+Northern Africa,https://usaminedroads.blob.core.windows.net/road-detections/AfricaNorth-Full.zip
+Western Africa,https://usaminedroads.blob.core.windows.net/road-detections/AfricaWest-Full.zip
+Central Africa,https://usaminedroads.blob.core.windows.net/road-detections/AfricaCenter-Full.zip
+Eastern Africa,https://usaminedroads.blob.core.windows.net/road-detections/AfricaEast-Full.zip
+Southern Africa,https://usaminedroads.blob.core.windows.net/road-detections/AfricaSouth-Full.zip
+Europe,https://usaminedroads.blob.core.windows.net/road-detections/Europe-Full.zip
+Oceania,https://usaminedroads.blob.core.windows.net/road-detections/Oceania-Full.zip
+Central America,https://usaminedroads.blob.core.windows.net/road-detections/AmericaCenter-Full.zip
+Canada,https://usaminedroads.blob.core.windows.net/road-detections/Canada-Full.zip
+South Asia,https://usaminedroads.blob.core.windows.net/road-detections/AsiaSouth-Full.zip
+Southeastern Asia,https://usaminedroads.blob.core.windows.net/road-detections/AsiaSouthEast-Full.zip
+North Asia,https://usaminedroads.blob.core.windows.net/road-detections/AsiaNorth-Full.zip
+Japan,https://usaminedroads.blob.core.windows.net/road-detections/Japan-Full.zip
