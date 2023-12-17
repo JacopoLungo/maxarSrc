@@ -38,6 +38,23 @@ def show_box(boxes, ax, color='r'):
         w, h = box[2] - box[0], box[3] - box[1]
         ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor=color, facecolor=(0,0,0,0), lw=0.5))
 
+def show_points(coords: np.array, labels: np.array, ax, marker_size=75):
+    """
+    Plot an array of points.
+    Inputs:
+        coords: a np array of shape (n, 2) containing the coordinates of the points
+        labels: a np array of shape (n,) containing the labels of the points
+        ax: the axis on which to plot the points
+        marker_size: the size of the markers
+    """
+    if labels == None:
+        ax.scatter(coords[:, 0], coords[:, 1], color='b', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
+    else:
+        pos_points = coords[labels==1]
+        neg_points = coords[labels==0]
+        ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
+        ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
+
 def plotShapelyPoints(points: Union[List[Point], Point], ax, color = 'red', markersize = 5):
     """
     #! non usare questo ma solo show_points
@@ -50,20 +67,6 @@ def plotShapelyPoints(points: Union[List[Point], Point], ax, color = 'red', mark
     for point in points:
         x, y = point.xy
         ax.plot(x, y, 'o', color = color, markersize = markersize)
-
-def show_points(coords, labels, ax, marker_size=75):
-    """
-    Plot an array of points.
-    Inputs:
-        coords: a np array of shape (n, 2) containing the coordinates of the points
-        labels: a np array of shape (n,) containing the labels of the points
-        ax: the axis on which to plot the points
-        marker_size: the size of the markers
-    """
-    pos_points = coords[labels==1]
-    neg_points = coords[labels==0]
-    ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
-    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
 
 def plot_comparison(img, masks, alpha = 0.6):
     """
