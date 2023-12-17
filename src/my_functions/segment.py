@@ -28,7 +28,7 @@ from typing import Union, List
 # Buildings
 #############
 
-def building_gdf(country, csv_root = '', dataset_crs = None, quiet = False):
+def building_gdf(country, csv_root, dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.
@@ -139,7 +139,7 @@ def segment_buildings(predictor, building_boxes, img4Sam: np.array, use_bbox = T
     
     transformed_points = None
     transformed_point_labels = None
-    """if use_center_points: #TODO: aggiustare l'utilizzo di punti, al momeno non funziona
+    """if use_center_points: #TODO: aggiustare l'utilizzo di punti, al momento non funziona
         point_coords = torch.tensor([[(sublist[0] + sublist[2])/2, (sublist[1] + sublist[3])/2] for sublist in building_boxes_t], device=predictor.device)
         point_labels = torch.tensor([1] * point_coords.shape[0], device=predictor.device)[:, None]
         transformed_points = predictor.transform.apply_coords_torch(point_coords, img4Sam.shape[:2]).unsqueeze(1)
