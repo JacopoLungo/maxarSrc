@@ -28,7 +28,7 @@ from typing import Union, List
 # Buildings
 #############
 
-def building_gdf(country, csv_root, dataset_crs = None, quiet = False):
+def building_gdf(country, csv_path, dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.
@@ -39,7 +39,7 @@ def building_gdf(country, csv_root, dataset_crs = None, quiet = False):
         dataset_crs: the crs in which to convert the coordinates of the buildings
         quiet: if True, it doesn't print anything
     """
-    dataset_links = pd.read_csv(csv_root)
+    dataset_links = pd.read_csv(csv_path)
     country_links = dataset_links[dataset_links.Location == country]
     #TODO: eventualmente filtrare anche sul quadkey dell evento
     if not quiet:
