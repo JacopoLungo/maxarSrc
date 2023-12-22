@@ -8,6 +8,12 @@ import pandas as pd
 from shapely import geometry
 import json
 from typing import List, Tuple, Union
+import time
+
+def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
+    metadata_root = Path(metadata_root)
+    df = pd.read_csv(metadata_root / 'evet_id2State2Region.csv')
+    return df[df['event_id'] == event_name]['region'].values[0]
 
 def get_all_events(data_root = '/mnt/data2/vaschetti_data/maxar'):
     """
@@ -81,7 +87,6 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vasch
     miny -= (extra_mt/2)
     maxx += (extra_mt/2)
     maxy += (extra_mt/2)
-    
     if not return_proj_coords:
         source_crs = gdf['proj:epsg'].values[0]
         target_crs = pyproj.CRS('EPSG:4326')
@@ -90,9 +95,9 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vasch
         bott_left_lat, bott_left_lon = transformer.transform(minx, miny)
         top_right_lat, top_right_lon = transformer.transform(maxx, maxy)
         
-        return (bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat), target_crs
+        return ((bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)), target_crs
     
-    return (minx, miny), (maxx, maxy), gdf['proj:epsg'].values[0]
+    return ((minx, miny), (maxx, maxy)), gdf['proj:epsg'].values[0]
 
 def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = False):
     
@@ -104,7 +109,7 @@ def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = F
     crs_set = set()
 
     for mosaic_name in get_mosaics_names(event_name, when = when):
-        (tmp_minx, tmp_miny), (tmp_maxx, tmp_maxy), crs = get_mosaic_bbox(event_name, mosaic_name, extra_mt = extra_mt, return_proj_coords = True)
+        ((tmp_minx, tmp_miny), (tmp_maxx, tmp_maxy)), crs = get_mosaic_bbox(event_name, mosaic_name, extra_mt = extra_mt, return_proj_coords = True)
         crs_set.add(crs)
         if tmp_minx < minx:
             minx = tmp_minx
