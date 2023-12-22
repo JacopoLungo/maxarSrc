@@ -299,6 +299,7 @@ class Event:
                  name,
                  when = 'pre',
                  maxar_root = '/mnt/data2/vaschetti_data/maxar',
+                 region = 'infer'
                  ):
         #Paths
         self.maxar_root = maxar_root
@@ -307,7 +308,7 @@ class Event:
         #Event
         self.name = name
         self.when = when
-        self.region_name = get_region_name(self.name)
+        self.region_name = get_region_name(self.name) if region == 'infer' else region
         self.bbox = get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = get_mosaics_names(self.name, self.maxar_root, self.when)
     
