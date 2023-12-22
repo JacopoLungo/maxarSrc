@@ -248,30 +248,107 @@ def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_nam
     return road_gdf[hits]
 
 class Mosaic:
-    def __init__(self, name):
+    def __init__(self,
+                 name,
+                 event_name,
+                 path_mosaic_metatada = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
+                 ):
+        #Paths
+        self.path_mosaic_metatada = path_mosaic_metatada
+
+        #Mosaic
         self.name = name
-        self.tiles_path = []
+        self.event_name = event_name
+        self.bbox, _ = get_mosaic_bbox(self.event_name,
+                                          self.name,
+                                          self.path_mosaic_metatada,
+                                          extra_mt=1000)
+        self.road_gdf = None
+        self.build_gdf = None
+        self.tiles_paths = []
 
-    def add_tile(self, tile):
-        self.tiles.append(tile)
+        #Roads
+        self.road_num = None
 
-    def remove_tile(self, tile):
-        self.tiles.remove(tile)
+        #Buildings
+        self.build_num = None
 
-    def get_tiles(self):
-        return self.tiles
+        #Event
+        self.event_road_gdf = None
+
+    def set_event_road_gdf(self, gdf):
+        self.event_road_gdf = gdf
+
+    def set_road_gdf(self):
+        if self.event_road_gdf is None:
+            raise ValueError('event_road_gdf is None')
+        self.road_gdf = filter_gdf_w_bbox(self.event_road_gdf, self.bbox)
+        self.road_num = len(self.road_gdf)
+    
+    def set_build_gdf(self, buildings_dataset_links_path):
+        qk_hits = intersecting_qks(*self.bbox)
+        self.build_gdf = qk_building_gdf(qk_hits, csv_path=buildings_dataset_links_path)
+        self.build_num = len(self.build_gdf)
+    
+    def __str__(self) -> str:
+        return self.name
 
 
 class Event:
-    def __init__(self, name):
+    def __init__(self,
+                 name,
+                 when = 'pre',
+                 maxar_root = '/mnt/data2/vaschetti_data/maxar',
+                 ):
+        #Paths
+        self.maxar_root = maxar_root
+        self.buildings_ds_links_path = '/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv'
+        
+        #Event
         self.name = name
-        self.mosaics_name = []
+        self.when = when
+        self.region_name = get_region_name(self.name)
+        self.bbox = get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
+        self.all_mosaics_names = get_mosaics_names(self.name, self.maxar_root, self.when)
+    
+        #Roads
+        self.road_gdf = None
 
-    def add_mosaic(self, mosaic):
-        self.mosaics.append(mosaic)
+        #Mosaics
+        self.mosaics = {} #TODO decidere se lista o dict
 
-    def remove_mosaic(self, mosaic):
-        self.mosaics.remove(mosaic)
+        #Init mosaics
+        for m_name in self.all_mosaics_names:
+            self.mosaics[m_name] = Mosaic(m_name, self.name)
 
-    def get_mosaics(self):
-        return self.mosaics
+    #Roads methods
+    def set_road_gdf(self): #set road_gdf for the event
+        region_road_gdf = get_region_road_gdf(self.region_name)
+        self.road_gdf = filter_gdf_w_bbox(region_road_gdf, self.bbox)
+
+    def set_road_gdf_in_mos(self, mosaic_name): #set road_gdf for the mosaic
+        if self.road_gdf is None:
+            self.set_road_gdf()
+
+        self.mosaics[mosaic_name].set_event_road_gdf(self.road_gdf)
+        self.mosaics[mosaic_name].set_road_gdf()
+
+    def set_roads_gdf_all_mos(self): #set road_gdf for all the mosaics
+        if self.road_gdf is None:
+            self.set_road_gdf()
+
+        for mosaic_name, mosaic in self.mosaics.items():
+            if mosaic.road_gdf is None:
+                self.set_road_gdf_in_mos(mosaic_name)
+    
+    #Buildings methods
+    def set_build_gdf_in_mos(self, mosaic_name):
+        self.mosaics[mosaic_name].set_build_gdf(self.buildings_ds_links_path)
+
+    def set_build_gdf_all_mos(self):
+        for mosaic_name, mosaic in self.mosaics.items():
+            if mosaic.build_gdf is None:
+                self.set_build_gdf_in_mos(mosaic_name)
+
+    def get_mosaic(self, mosaic_name):
+        return self.mosaics[mosaic_name]
