@@ -198,10 +198,14 @@ def get_region_road_gdf(region_name, roads_root = '/mnt/data2/vaschetti_data/MS_
     """
     if region_name[-4:] != '.tsv':
         region_name = region_name + '.tsv'
+    def custom_json_loads(s):
+        return geometry.shape(json.loads(s)['geometry'])
 
     roads_root = Path(roads_root)
     region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
-    region_road_df['geometry'] = region_road_df['geometry'].apply(json.loads).apply(lambda d: geometry.shape(d.get('geometry')))
+    #region_road_df['geometry'] = region_road_df['geometry'].apply(json.loads).apply(lambda d: geometry.shape(d.get('geometry')))
+    #slightly faster
+    region_road_df['geometry'] = region_road_df['geometry'].apply(custom_json_loads)
     region_road_gdf = gpd.GeoDataFrame(region_road_df, crs=4326)
     return region_road_gdf
 
