@@ -24,11 +24,13 @@ from PIL import Image
 from torchvision.ops import box_convert
 from typing import Union, List
 
+from groundingdino.util.inference import predict as GD_predict
+
 #############
 # Buildings
 #############
 
-def building_gdf(country, csv_path, dataset_crs = None, quiet = False):
+def building_gdf(country, csv_path = 'metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.
@@ -181,7 +183,7 @@ def rel_road_lines(geodf: gpd.GeoDataFrame,
         query_bbox_poly: Polygon of the reference bbox
         res: resolution of the image
     Returns:
-        result: list of lists of tuples with the relative coordinates
+        result: list of LineString with the relative coordinates
     """
     ref_coords = query_bbox_poly.bounds
     ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner
@@ -419,6 +421,26 @@ def GDboxes2SamBoxes(boxes: torch.Tensor, img_shape: Union[tuple[float, float], 
     SAM_boxes = SAM_boxes * torch.Tensor([w, h, w, h])
     SAM_boxes = box_convert(boxes=SAM_boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
     return SAM_boxes
+
+def get_gdino_boxes(img_batch,
+                    GDINO_model,
+                    TEXT_PROMPT,
+                    BOX_TRESHOLD,
+                    TEXT_TRESHOLD,
+                    dataset_res,
+                    max_area_mt2 =3000):
+    image_transformed = dino_img_load(img_batch)
+    tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD)
+    tree_boxes4Sam = []
+    if len(tree_boxes) != 0:
+        sample_size = image_transformed.shape[-1] #TODO: controllare se è giusto
+        keep_ix_tree_boxes = filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
+        tree_boxes4Sam = GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
+    return tree_boxes4Sam
+
+#############
+#General
+#############
 
 def segment_from_boxes(predictor, boxes, img4Sam, use_bbox = True, use_center_points = False):
     """
