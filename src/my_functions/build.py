@@ -10,6 +10,10 @@ import json
 from typing import List, Tuple, Union
 import time
 import os
+from torchgeo.datasets import stack_samples
+from my_functions import samplers, geoDatasets
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
     metadata_root = Path(metadata_root)
@@ -293,6 +297,32 @@ class Mosaic:
     
     def __str__(self) -> str:
         return self.name
+    
+    def segment_tile(self, tile_path, batch_size, size = 600, stride = 300):
+        dataset = geoDatasets.Maxar(str(tile_path))
+        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=batch_size, size=size, stride=stride)
+        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
+
+        for batch in tqdm(dataloader):
+            #print(batch.keys())
+            #samples_list = unbind_samples(batch)
+            #print(samples_list)
+            #img_batch = batch['image']
+            #print(type(img_batch))
+            
+            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
+            building_mask_b = None
+            tree_mask_b = None
+            road_mask_b = None
+
+            #fig, axs = plt.subplots(1, batch_size, figsize=(30, 30))
+            #for i in range(batch_size):
+            #    axs[i].imshow(img_b[i])
+            #print(img_b.shape)
+
+    def segment_all_tiles(self):
+        for tile_path in self.tiles_paths:
+            self.segment_tile(tile_path)
 
 
 class Event:

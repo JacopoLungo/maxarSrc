@@ -8,6 +8,7 @@ from collections.abc import Iterator
 import torch
 import os
 import shapely
+import math
 
 
 # Samplers per Base Datasets
@@ -105,6 +106,81 @@ class MyGridGeoSampler(GridGeoSampler):
                         yield selected_bbox
                     else:
                         continue
+
+class MyBatchGridGeoSampler(GridGeoSampler):
+    def __init__(self,
+        dataset: GeoDataset,
+        size: Union[tuple[float, float], float],
+        batch_size: int,
+        stride: Union[tuple[float, float], float],
+        roi: Optional[BoundingBox] = None,
+        units: Units = Units.PIXELS,
+        ) -> None:
+
+        super().__init__(dataset, size, stride, roi, units)
+        self.batch_size = batch_size
+    
+    def __iter__(self) -> Iterator[BoundingBox]:
+        """Return the index of a dataset.
+
+        Returns:
+            (minx, maxx, miny, maxy, mint, maxt) coordinates to index a dataset
+        """
+        batch = []
+        # For each tile...
+        for k, hit in enumerate(self.hits): #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
+            tile_path = hit.object
+            tile_polygon = path_2_tilePolygon(tile_path)
+
+            print('In sampler') #TODO: togliere le print quando usato davvero
+            print('tile_polygon: ', tile_polygon)
+
+            bounds = BoundingBox(*hit.bounds)
+            rows, cols = tile_to_chips(bounds, self.size, self.stride)
+            mint = bounds.mint
+            maxt = bounds.maxt
+            
+            discarder_chips = 0
+            # For each row...
+            for i in range(rows):
+                miny = bounds.miny + i * self.stride[0]
+                maxy = miny + self.size[0]
+
+                # For each column...
+                for j in range(cols):
+                    minx = bounds.minx + j * self.stride[1]
+                    maxx = minx + self.size[1]
+                    selected_bbox = BoundingBox(minx, maxx, miny, maxy, mint, maxt)
+                    #Check if the selected_bbox intersects the tile_polygon (to avoid all black images)
+                    selected_bbox_polygon = boundingBox_2_Polygon(selected_bbox)
+
+                    if selected_bbox_polygon.intersects(tile_polygon):
+                        #print("selected_bbox_polygon", selected_bbox_polygon)
+                        batch.append(selected_bbox) #TODO: controlla che succede se l'ultimo batch non è pieno
+                    else:
+                        discarder_chips += 1
+                        continue
+                    
+                    is_last_batch = k == len(self.hits) - 1 and i == rows - 1 and j == cols - 1
+                    
+                    if len(batch) == self.batch_size or is_last_batch:
+                        if is_last_batch and len(batch) < self.batch_size:
+                            #print('Last batch not full. Only', len(batch), 'chips')
+                            #pad the last batch with the last selected_bbox if it is not full
+                            batch.extend([selected_bbox] * (self.batch_size - len(batch)))
+
+                        yield batch
+                        batch = []
+        print('Discarded empty chips: ', discarder_chips)
+        print('True batch size: ', math.ceil(len(self) - discarder_chips/self.batch_size))
+
+    def __len__(self) -> int:
+        """Return the number of batches in a single epoch.
+
+        Returns:
+            number of batches in an epoch
+        """
+        return math.ceil(self.length / self.batch_size)
 
 # Samplers per Intersection Datasets
 class MyIntersectionRandomGeoSampler(RandomGeoSampler):
