@@ -15,6 +15,7 @@ from my_functions import samplers, geoDatasets
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+from my_functions import segment
 
 def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
     metadata_root = Path(metadata_root)
@@ -258,6 +259,44 @@ def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_nam
     
     return road_gdf[hits]
 
+
+from groundingdino.util.inference import load_model as GD_load_model
+class SegmentConfig:
+    """
+    Config class for the segmentation pipeline.
+    """
+    def __init__(self,
+                 batch_size,
+                 size = 600,
+                 stride = 300,
+                 device = 'cuda',
+                 GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
+                 GD_config_file = "GroundingDINO_SwinT_OGC.py",
+                 GD_weights = "groundingdino_swint_ogc.pth",
+                 TEXT_PROMPT = 'green tree',
+                 BOX_TRESHOLD = 0.15,
+                 TEXT_TRESHOLD = 0.30,
+                 max_area_GD_boxes_mt2 = 3000):
+        
+        #General
+        self.batch_size = batch_size
+        self.size = size
+        self.stride = stride
+
+        #Grounding Dino
+        self.GD_root = Path(GD_root)
+        self.CONFIG_PATH = self.GD_root / GD_config_file
+        self.WEIGHTS_PATH = self.GD_root / GD_weights
+        self.device = device
+
+        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH, device = self.device)
+        self.TEXT_PROMPT = TEXT_PROMPT
+        self.BOX_TRESHOLD = BOX_TRESHOLD
+        self.TEXT_TRESHOLD = TEXT_TRESHOLD
+        self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
+
+        #Efficient SAM
+
 class Mosaic:
     def __init__(self,
                  name,
@@ -299,22 +338,18 @@ class Mosaic:
     def __str__(self) -> str:
         return self.name
     
-    def segment_tile(self, tile_path, batch_size, seg_model, detect_model, size = 600, stride = 300):
+    def segment_tile(self, tile_path):
+        seg_config = self.event.seg_config
+
         dataset = geoDatasets.Maxar(str(tile_path))
-        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=batch_size, size=size, stride=stride)
+        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
         canvas = np.zeros((dataset.height, dataset.width, 3), dtype=np.uint8)
 
-        for batch in tqdm(dataloader):
-            #print(batch.keys())
-            #samples_list = unbind_samples(batch)
-            #print(samples_list)
-            #img_batch = batch['image']
-            #print(type(img_batch))
-            
+        for batch in tqdm(dataloader):          
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
-            tree_boxes_b = None
+            tree_boxes_b = segment.get_GD_boxes(img_b, seg_config.GD_model, seg_config.TEXT_PROMPT, seg_config.BOX_TRESHOLD, seg_config.TEXT_TRESHOLD, dataset.res, max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
             building_boxes_b = None
             tree_and_building_mask_b = None
             road_mask_b = None
@@ -326,6 +361,28 @@ class Mosaic:
             #print(img_b.shape)
         
         #TODO: salvare la canvas come tiff
+    
+    """def segment_tile(self, tile_path, batch_size, seg_model, detect_model, size = 600, stride = 300):
+        dataset = geoDatasets.Maxar(str(tile_path))
+        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=batch_size, size=size, stride=stride)
+        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
+
+        canvas = np.zeros((dataset.height, dataset.width, 3), dtype=np.uint8)
+
+        for batch in tqdm(dataloader):          
+            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
+            tree_boxes_b = segment.get_GD_boxes(img_b, GDINO_model, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD, dataset.res, max_area_mt2 =3000)
+            building_boxes_b = None
+            tree_and_building_mask_b = None
+            road_mask_b = None
+
+
+            #fig, axs = plt.subplots(1, batch_size, figsize=(30, 30))
+            #for i in range(batch_size):
+            #    axs[i].imshow(img_b[i])
+            #print(img_b.shape)
+        
+        #TODO: salvare la canvas come tiff"""
 
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
@@ -335,11 +392,15 @@ class Mosaic:
 class Event:
     def __init__(self,
                  name,
+                 seg_config: SegmentConfig,
                  when = 'pre', #'pre', 'post' or None
                  maxar_root = '/mnt/data2/vaschetti_data/maxar',
                  maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
                  region = 'infer'
                  ):
+        #Segmentation
+        self.seg_config = seg_config
+
         #Paths
         self.maxar_root = Path(maxar_root)
         self.buildings_ds_links_path = Path('/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv')
@@ -390,3 +451,6 @@ class Event:
 
     def get_mosaic(self, mosaic_name):
         return self.mosaics[mosaic_name]
+
+
+
