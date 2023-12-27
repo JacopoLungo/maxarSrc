@@ -30,7 +30,7 @@ from groundingdino.util.inference import predict as GD_predict
 # Buildings
 #############
 
-def building_gdf(country, csv_path = 'metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
+def building_gdf(country, csv_path = '/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.
@@ -114,7 +114,21 @@ def rel_polyg_coord(geodf:gpd.GeoDataFrame,
         rel_y_s = (ref_maxy - np.array(y_s)) / res
         rel_coords = list(zip(rel_x_s, rel_y_s))
         result.append(rel_coords)
-    return result   
+    return result
+
+def get_batch_buildings_boxes(batch_bbox: List, proj_buildings_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 10):
+    batch_building_boxes = []
+    for bbox in batch_bbox:
+        query_bbox_poly = boundingBox_2_Polygon(bbox)
+        index_MS_buildings = proj_buildings_gdf.sindex
+        buildig_hits = index_MS_buildings.query(query_bbox_poly)
+        building_boxes = [] #append empty list if no buildings
+        if len(buildig_hits) > 0:
+            building_boxes = rel_bbox_coords(proj_buildings_gdf.iloc[buildig_hits], query_bbox_poly.bounds, dataset_res, ext_mt=ext_mt)
+
+        batch_building_boxes.append(building_boxes)
+
+    return batch_building_boxes
 
 def segment_buildings(predictor, building_boxes, img4Sam: np.array, use_bbox = True, use_center_points = False):
     """
@@ -364,7 +378,7 @@ def clean_mask(road_lines: Union[LineString, List[LineString]],
 #Trees
 #############
 
-def dino_img_load(np_img_rgb: np.array)-> torch.Tensor:
+def GD_img_load(np_img_rgb: np.array)-> torch.Tensor:
     """
     Transform the image from np.array to torch.Tensor and normalize it.
     """
@@ -422,21 +436,26 @@ def GDboxes2SamBoxes(boxes: torch.Tensor, img_shape: Union[tuple[float, float], 
     SAM_boxes = box_convert(boxes=SAM_boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
     return SAM_boxes
 
-def get_gdino_boxes(img_batch,
+def get_GD_boxes(img_batch: np.array, #b,h,w,c
                     GDINO_model,
                     TEXT_PROMPT,
                     BOX_TRESHOLD,
                     TEXT_TRESHOLD,
                     dataset_res,
-                    max_area_mt2 =3000):
-    image_transformed = dino_img_load(img_batch)
-    tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD)
-    tree_boxes4Sam = []
-    if len(tree_boxes) != 0:
-        sample_size = image_transformed.shape[-1] #TODO: controllare se è giusto
-        keep_ix_tree_boxes = filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
-        tree_boxes4Sam = GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
-    return tree_boxes4Sam
+                    max_area_mt2 = 3000):
+    
+    batch_tree_boxes4Sam = []
+    sample_size = img_batch.shape[1]
+
+    for img in img_batch:
+        image_transformed = GD_img_load(img)
+        tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD)
+        tree_boxes4Sam = []
+        if len(tree_boxes) != 0:
+            keep_ix_tree_boxes = filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
+            tree_boxes4Sam = GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
+            batch_tree_boxes4Sam.append(tree_boxes4Sam)
+    return batch_tree_boxes4Sam
 
 #############
 #General

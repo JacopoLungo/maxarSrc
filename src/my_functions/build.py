@@ -103,7 +103,7 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vasch
         bott_left_lat, bott_left_lon = transformer.transform(minx, miny)
         top_right_lat, top_right_lon = transformer.transform(maxx, maxy)
         
-        return ((bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)), target_crs
+        return ((bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)), gdf['proj:epsg'].values[0]
     
     return ((minx, miny), (maxx, maxy)), gdf['proj:epsg'].values[0]
 
@@ -130,7 +130,8 @@ def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = F
     
     if not return_proj_coords:
         if len(crs_set) > 1:
-            raise Exception('Different crs in the same event')
+            #print(crs_set)
+            raise Exception('Different crs in the same event: ', crs_set)
         else:
             source_crs = list(crs_set)[0]
             target_crs = pyproj.CRS('EPSG:4326')
@@ -232,6 +233,8 @@ def filter_gdf_w_bbox(gbl_gdf: gpd.GeoDataFrame, bbox: Union[List[Tuple], Tuple[
     query_bbox_poly = geometry.Polygon(vertices)
     
     hits = gbl_gdf.geometry.intersects(query_bbox_poly)
+    #TODO: controllare magari funziona anche...
+    #hits = gbl_gdf.sindex.query(query_bbox_poly)
     
     return gbl_gdf[hits]
 
@@ -276,7 +279,7 @@ class SegmentConfig:
                  TEXT_PROMPT = 'green tree',
                  BOX_TRESHOLD = 0.15,
                  TEXT_TRESHOLD = 0.30,
-                 max_area_GD_boxes_mt2 = 3000):
+                 max_area_GD_boxes_mt2 = 6000):
         
         #General
         self.batch_size = batch_size
@@ -306,7 +309,7 @@ class Mosaic:
         #Mosaic
         self.name = name
         self.event = event
-        self.bbox, _ = get_mosaic_bbox(self.event.name,
+        self.bbox, self.crs = get_mosaic_bbox(self.event.name,
                                           self.name,
                                           self.event.maxar_metadata_path,
                                           extra_mt=1000)
@@ -321,6 +324,7 @@ class Mosaic:
 
         #Buildings
         self.build_gdf = None
+        self.proj_build_gdf = None
         self.build_num = None
 
     def set_road_gdf(self):
@@ -330,9 +334,10 @@ class Mosaic:
         self.road_gdf = filter_gdf_w_bbox(self.event.road_gdf, self.bbox)
         self.road_num = len(self.road_gdf)
     
-    def set_build_gdf(self, buildings_dataset_links_path):
+    def set_build_gdf(self):
         qk_hits = intersecting_qks(*self.bbox)
-        self.build_gdf = qk_building_gdf(qk_hits, csv_path=buildings_dataset_links_path)
+        self.build_gdf = qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
+        self.proj_build_gdf =  self.build_gdf.to_crs(self.crs)
         self.build_num = len(self.build_gdf)
     
     def __str__(self) -> str:
@@ -345,14 +350,25 @@ class Mosaic:
         sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
-        canvas = np.zeros((dataset.height, dataset.width, 3), dtype=np.uint8)
+        canvas = np.zeros((seg_config.size, seg_config.size, 3), dtype=np.uint8)
 
         for batch in tqdm(dataloader):          
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
-            tree_boxes_b = segment.get_GD_boxes(img_b, seg_config.GD_model, seg_config.TEXT_PROMPT, seg_config.BOX_TRESHOLD, seg_config.TEXT_TRESHOLD, dataset.res, max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
-            building_boxes_b = None
+            tree_boxes_b = segment.get_GD_boxes(img_b,
+                                                seg_config.GD_model,
+                                                seg_config.TEXT_PROMPT,
+                                                seg_config.BOX_TRESHOLD,
+                                                seg_config.TEXT_TRESHOLD,
+                                                dataset.res,
+                                                max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
+            
+            building_boxes_b = segment.get_batch_buildings_boxes(batch['bbox'],
+                                                                proj_buildings_gdf = self.proj_build_gdf,
+                                                                dataset_res = dataset.res,
+                                                                ext_mt = 10)
             tree_and_building_mask_b = None
             road_mask_b = None
+            all_mask_b = None
 
 
             #fig, axs = plt.subplots(1, batch_size, figsize=(30, 30))
