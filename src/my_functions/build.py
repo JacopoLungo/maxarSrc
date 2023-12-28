@@ -16,6 +16,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 from my_functions import segment
+import torch
+
+sys.path.append('/home/vaschetti/maxarSrc/models/EfficientSAM')
+from efficient_sam.build_efficient_sam import build_efficient_sam_vitt
 
 def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
     metadata_root = Path(metadata_root)
@@ -262,7 +266,8 @@ def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_nam
     
     return road_gdf[hits]
 
-def get_boxes4FSam(tree_boxes_b, building_boxes_b, max_detect):
+"""unused
+def get_boxes4FSam(tree_boxes_b, building_boxes_b, max_detect: int):
     boxes4FSam = [] 
     pad_value = -10
     for tree_detec, build_detec in zip(tree_boxes_b, building_boxes_b):
@@ -271,8 +276,29 @@ def get_boxes4FSam(tree_boxes_b, building_boxes_b, max_detect):
         pad_width = ((0,pad_len),(0, 0))
         boxes4FSam.append(np.pad(tree_build_detect, pad_width, constant_values=pad_value))
     
-    return np.array(boxes4FSam)
+    return np.array(boxes4FSam)"""
 
+def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img_x, 4)
+                          building_boxes_b: List, 
+                          max_detect: int):
+    input_lbs = []
+    input_pts = []
+    pts_pad_value = -10
+    lbs_pad_value = 0
+    for tree_detec, build_detec in zip(tree_boxes_b, building_boxes_b):
+        tree_build_detect = np.concatenate((tree_detec, build_detec)) #(query_img_x, 4)
+        lbs = np.array([[2,3]]*tree_build_detect.shape[0]) #(query_img_x, 2)
+
+        pad_len = max_detect - (tree_build_detect.shape[0] + 1)
+        pad_width = ((0,pad_len),(0, 0))
+        padded_tree_build_detect = np.pad(tree_build_detect, pad_width, constant_values=pts_pad_value)
+        img_input_pts = np.expand_dims(padded_tree_build_detect, axis = 0).reshape(-1,2,2) # (max_queries, 2, 2)
+        input_pts.append(img_input_pts)
+
+        padded_lbs = np.pad(lbs, pad_width, constant_values = lbs_pad_value)# (max_queries, 2)
+        input_lbs.append(padded_lbs)
+
+    return np.array(input_pts), np.array(input_lbs) # (batch_size, max_queries, 2, 2), (batch_size, max_queries, 2)
 
 
 
@@ -292,7 +318,8 @@ class SegmentConfig:
                  TEXT_PROMPT = 'green tree',
                  BOX_TRESHOLD = 0.15,
                  TEXT_TRESHOLD = 0.30,
-                 max_area_GD_boxes_mt2 = 6000):
+                 max_area_GD_boxes_mt2 = 6000,
+                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM'):
         
         #General
         self.batch_size = batch_size
@@ -312,6 +339,7 @@ class SegmentConfig:
         self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
 
         #Efficient SAM
+        self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt'))
 
 class Mosaic:
     def __init__(self,

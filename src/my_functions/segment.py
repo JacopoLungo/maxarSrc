@@ -24,6 +24,7 @@ from PIL import Image
 from torchvision.ops import box_convert
 from typing import Union, List
 
+from torchvision import transforms
 from groundingdino.util.inference import predict as GD_predict
 
 #############
@@ -516,3 +517,45 @@ def segment_from_boxes(predictor, boxes, img4Sam, use_bbox = True, use_center_po
         used_points = point_coords.cpu().numpy()
 
     return mask, used_boxes, used_points #returna tutti np array
+
+
+def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
+                    input_points: np.array, #b, max_queries, 2, 2
+                    input_labels: np.array, #b, max_queries, 2
+                    efficient_sam,
+                    num_parall_queries: int = 50,
+                    device = 'cpu',
+                    empty_cuda_cache = True):
+    
+    img_b_tsr = original_img_tsr.div(255)
+    batch_size, _, input_h, input_w = img_b_tsr.shape
+    img_b_tsr = img_b_tsr.to(device)
+    image_embeddings = efficient_sam.get_image_embeddings(img_b_tsr)
+    
+    stop = input_points.shape[1]
+    for i in range(0, stop , num_parall_queries):
+        start_idx = i
+        end_idx = min(i + num_parall_queries, stop)
+        predicted_logits, predicted_iou = efficient_sam.predict_masks(image_embeddings,
+                                                                input_points[:, start_idx: end_idx],
+                                                                input_labels[:, start_idx: end_idx],
+                                                                multimask_output=True,
+                                                                input_h = input_h,
+                                                                input_w = input_w,
+                                                                output_h=input_h,
+                                                                output_w=input_w)
+        
+        if i == 0:
+            print('predicetd_logits:', predicted_logits.shape)
+            np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
+        else:
+            np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
+        if empty_cuda_cache:
+            del predicted_logits, predicted_iou
+            torch.cuda.empty_cache()
+    
+    return np_complete_masks
+
+
+    
+    
