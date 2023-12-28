@@ -556,6 +556,27 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
     
     return np_complete_masks
 
+def discern(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.array):
+    h, w = all_mask_b.shape[2:]
+    tree_mask_b = build_mask_b = pad_mask_b = np.full((1, h, w), False)
+
+    all_mask_b = np.greater_equal(all_mask_b, 0) #from logits to bool
+    for all_mask, tree_ix, build_ix in zip (all_mask_b, num_trees4img, num_build4img):
+        #all_mask.shape = (num_mask, h, w)
+        tree_mask = all_mask[ : tree_ix].any(axis=0) #(h, w)
+        tree_mask_b = np.concatenate((tree_mask_b, tree_mask[None, ...]), axis=0) #(b, h, w)
+
+        build_mask = all_mask[tree_ix : (tree_ix + build_ix)].any(axis=0)
+        build_mask_b = np.concatenate((build_mask_b, build_mask[None, ...]), axis=0)
+        
+        pad_mask = all_mask[(tree_ix + build_ix) : ].any(axis=0)
+        pad_mask_b = np.concatenate((pad_mask_b, pad_mask[None, ...]), axis=0)
+    
+    return tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:] #all (b, h, w), slice out the first element
+
+
+        
+
 
     
     
