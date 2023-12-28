@@ -262,6 +262,19 @@ def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_nam
     
     return road_gdf[hits]
 
+def get_boxes4FSam(tree_boxes_b, building_boxes_b, max_detect):
+    boxes4FSam = [] 
+    pad_value = -10
+    for tree_detec, build_detec in zip(tree_boxes_b, building_boxes_b):
+        tree_build_detect = np.concatenate((tree_detec, build_detec))
+        pad_len = max_detect - (tree_build_detect.shape[0] + 1)
+        pad_width = ((0,pad_len),(0, 0))
+        boxes4FSam.append(np.pad(tree_build_detect, pad_width, constant_values=pad_value))
+    
+    return np.array(boxes4FSam)
+
+
+
 
 from groundingdino.util.inference import load_model as GD_load_model
 class SegmentConfig:
