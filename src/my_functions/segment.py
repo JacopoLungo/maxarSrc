@@ -574,6 +574,7 @@ def discern(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.arra
     
     return tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:] #all (b, h, w), slice out the first element
 
+#Use the batch version of this function
 def rmv_mask_overlap(overlapping_masks: np.array):
     """
     Remove overlapping between the masks. Giving priority according to the inverse of the order of
@@ -586,6 +587,22 @@ def rmv_mask_overlap(overlapping_masks: np.array):
         disjoined_masks[i] = np.where(sum_mask > 1, False, overlapping_masks[i])
 
     return disjoined_masks
+
+def rmv_mask_b_overlap(overlapping_masks_b: np.array): #(b, c, h, w)
+    """
+    Remove overlapping between the masks. Giving priority according to the inverse of the order of
+    the masks.
+    Third (building) mask has priority over second (trees) mask, and so on.
+    """
+
+    disjoined_masks_b = np.copy(overlapping_masks_b)
+    for i in range(overlapping_masks_b.shape[1] - 1):
+        sum_mask = np.sum(overlapping_masks_b[:,i:], axis=1)
+        disjoined_masks_b[:,i] = np.where(sum_mask > 1, False, overlapping_masks_b[:, i])
+    
+    return disjoined_masks_b
+
+
 
         
 
