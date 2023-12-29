@@ -185,7 +185,7 @@ def segment_buildings(predictor, building_boxes, img4Sam: np.array, use_bbox = T
 
 
 #############
-# Roads
+# Roads with SAM
 #############
 
 def rel_road_lines(geodf: gpd.GeoDataFrame,
@@ -376,6 +376,12 @@ def clean_mask(road_lines: Union[LineString, List[LineString]],
     
     return clear_mask
 
+#############
+# Roads with buffer
+#############
+
+
+
 
 #############
 #Trees
@@ -445,6 +451,7 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
                     BOX_TRESHOLD,
                     TEXT_TRESHOLD,
                     dataset_res,
+                    device,
                     max_area_mt2 = 3000):
     
     batch_tree_boxes4Sam = []
@@ -453,7 +460,7 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
 
     for img in img_batch:
         image_transformed = GD_img_load(img)
-        tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD)
+        tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD, device = device)
         num_trees4img.append(len(tree_boxes))
         tree_boxes4Sam = []
         if len(tree_boxes) != 0:
@@ -520,8 +527,8 @@ def segment_from_boxes(predictor, boxes, img4Sam, use_bbox = True, use_center_po
 
 
 def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
-                    input_points: np.array, #b, max_queries, 2, 2
-                    input_labels: np.array, #b, max_queries, 2
+                    input_points: torch.tensor, #b, max_queries, 2, 2
+                    input_labels: torch.tensor, #b, max_queries, 2
                     efficient_sam,
                     num_parall_queries: int = 50,
                     device = 'cpu',
@@ -529,7 +536,11 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
     
     img_b_tsr = original_img_tsr.div(255)
     batch_size, _, input_h, input_w = img_b_tsr.shape
+    
     img_b_tsr = img_b_tsr.to(device)
+    input_points = input_points.to(device)
+    input_labels = input_labels.to(device)
+
     image_embeddings = efficient_sam.get_image_embeddings(img_b_tsr)
     
     stop = input_points.shape[1]
@@ -602,10 +613,3 @@ def rmv_mask_b_overlap(overlapping_masks_b: np.array): #(b, c, h, w)
     
     return disjoined_masks_b
 
-
-
-        
-
-
-    
-    
