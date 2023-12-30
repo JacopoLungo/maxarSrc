@@ -17,6 +17,10 @@ from tqdm import tqdm
 import numpy as np
 from my_functions import segment
 import torch
+import rasterio
+from rasterio.features import rasterize
+from my_functions.samplers_utils import path_2_tilePolygon
+
 
 sys.path.append('/home/vaschetti/maxarSrc/models/EfficientSAM')
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt
@@ -290,6 +294,7 @@ def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img
         lbs = np.array([[2,3]]*tree_build_detect.shape[0]) #(query_img_x, 2)
 
         pad_len = max_detect - (tree_build_detect.shape[0] + 1)
+        print(pad_len)
         pad_width = ((0,pad_len),(0, 0))
         padded_tree_build_detect = np.pad(tree_build_detect, pad_width, constant_values=pts_pad_value)
         img_input_pts = np.expand_dims(padded_tree_build_detect, axis = 0).reshape(-1,2,2) # (max_queries, 2, 2)
@@ -325,21 +330,28 @@ class SegmentConfig:
         self.batch_size = batch_size
         self.size = size
         self.stride = stride
+        self.device = device
 
-        #Grounding Dino
+        #Grounding Dino (Trees)
         self.GD_root = Path(GD_root)
         self.CONFIG_PATH = self.GD_root / GD_config_file
         self.WEIGHTS_PATH = self.GD_root / GD_weights
-        self.device = device
 
-        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH, device = self.device)
+        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH, device = self.device).to(self.device)
+        print('- GD model device:', next(self.GD_model.parameters()).device)
         self.TEXT_PROMPT = TEXT_PROMPT
         self.BOX_TRESHOLD = BOX_TRESHOLD
         self.TEXT_TRESHOLD = TEXT_TRESHOLD
         self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
 
         #Efficient SAM
-        self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt'))
+        self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
+        print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
+        
+
+        #Roads
+
+
 
 class Mosaic:
     def __init__(self,
@@ -361,6 +373,7 @@ class Mosaic:
 
         #Roads
         self.road_gdf = None
+        self.proj_road_gdf = None
         self.road_num = None
 
         #Buildings
@@ -373,6 +386,7 @@ class Mosaic:
             self.event.set_road_gdf()
 
         self.road_gdf = filter_gdf_w_bbox(self.event.road_gdf, self.bbox)
+        self.proj_road_gdf =  self.road_gdf.to_crs(self.crs)
         self.road_num = len(self.road_gdf)
     
     def set_build_gdf(self):
@@ -384,6 +398,23 @@ class Mosaic:
     def __str__(self) -> str:
         return self.name
     
+    def get_tile_road_mask_np(self, tile_path): 
+        with rasterio.open(tile_path) as src:
+            transform = src.transform
+            tile_h = src.height
+            tile_w = src.width
+            out_meta = src.meta.copy()
+        query_bbox_poly = path_2_tilePolygon(tile_path)
+        road_lines = self.proj_roads_gdf[self.proj_roads_gdf.geometry.intersects(query_bbox_poly)]
+
+        if len(road_lines) != 0:
+            buffered_lines = road_lines.geometry.buffer(ext_mt)
+            road_mask = rasterize(buffered_lines, out_shape=(tile_h, tile_w), transform=transform)
+        else:
+            print('No roads')
+            road_mask = np.zeros((tile_h, tile_w))
+        return road_mask
+            
     def segment_tile(self, tile_path):
         seg_config = self.event.seg_config
 
