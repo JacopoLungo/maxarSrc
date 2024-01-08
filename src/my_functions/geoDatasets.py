@@ -1,5 +1,4 @@
-from torchgeo.datasets import RasterDataset, IntersectionDataset
-from torchgeo.datasets import BoundingBox
+from torchgeo.datasets import RasterDataset, IntersectionDataset, BoundingBox
 import torch
 import matplotlib.pyplot as plt
 import os

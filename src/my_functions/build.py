@@ -30,7 +30,7 @@ def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metada
     df = pd.read_csv(metadata_root / 'evet_id2State2Region.csv')
     return df[df['event_id'] == event_name]['region'].values[0]
 
-def get_all_events(data_root = '/mnt/data2/vaschetti_data/maxar'):
+def get_all_events(data_root = '/mnt/data2/vaschetti_data/maxar'):#TODO: restituire solo le cartelle che contengono un tiff
     """
     Get all the events in the data_root folder.
     Input:
@@ -123,9 +123,14 @@ def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = F
     maxy = 0
 
     crs_set = set()
-
+    first_crs = None
     for mosaic_name in get_mosaics_names(event_name, when = when):
         ((tmp_minx, tmp_miny), (tmp_maxx, tmp_maxy)), crs = get_mosaic_bbox(event_name, mosaic_name, extra_mt = extra_mt, return_proj_coords = True)
+        first_crs = crs if first_crs is None else first_crs
+        transformer = pyproj.Transformer.from_crs(crs, first_crs)
+        tmp_minx, tmp_miny = transformer.transform(tmp_minx, tmp_miny)
+        tmp_maxx, tmp_maxy = transformer.transform(tmp_maxx, tmp_maxy)
+
         crs_set.add(crs)
         if tmp_minx < minx:
             minx = tmp_minx
@@ -137,18 +142,15 @@ def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = F
             maxy = tmp_maxy
     
     if not return_proj_coords:
-        if len(crs_set) > 1:
-            #print(crs_set)
-            raise Exception('Different crs in the same event: ', crs_set)
-        else:
-            source_crs = list(crs_set)[0]
-            target_crs = pyproj.CRS('EPSG:4326')
-            transformer = pyproj.Transformer.from_crs(source_crs, target_crs)
+        
+        source_crs = first_crs #list(crs_set)[0]
+        target_crs = pyproj.CRS('EPSG:4326')
+        transformer = pyproj.Transformer.from_crs(source_crs, target_crs)
 
-            bott_left_lat, bott_left_lon = transformer.transform(minx, miny)
-            top_right_lat, top_right_lon = transformer.transform(maxx, maxy)
+        bott_left_lat, bott_left_lon = transformer.transform(minx, miny)
+        top_right_lat, top_right_lon = transformer.transform(maxx, maxy)
 
-            return (bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)
+        return (bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)
     
     return (minx, miny), (maxx, maxy)
 
@@ -193,7 +195,9 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
 
     if not quiet:
         print(f"Found {len(country_links)} links matching: {qk_list}")
-
+    if len(country_links) == 0:
+        print("No buildings for this region")
+        return gpd.GeoDataFrame()
     gdfs = []
     for _, row in country_links.iterrows():
         df = pd.read_json(row.Url, lines=True)
@@ -215,11 +219,20 @@ def get_region_road_gdf(region_name, roads_root = '/mnt/data2/vaschetti_data/MS_
     """
     if region_name[-4:] != '.tsv':
         region_name = region_name + '.tsv'
+    
     def custom_json_loads(s):
-        return geometry.shape(json.loads(s)['geometry'])
+        try:
+            return geometry.shape(json.loads(s)['geometry'])
+        except:
+            return geometry.LineString()
 
     roads_root = Path(roads_root)
-    region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
+    if region_name != 'USA.tsv':
+        print('not USA', region_name)
+        region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
+    else:
+        print('is USA', region_name)
+        region_road_df = pd.read_csv(roads_root/region_name, names =['geometry'], sep='\t')
     #region_road_df['geometry'] = region_road_df['geometry'].apply(json.loads).apply(lambda d: geometry.shape(d.get('geometry')))
     #slightly faster
     region_road_df['geometry'] = region_road_df['geometry'].apply(custom_json_loads)
@@ -530,7 +543,7 @@ class Event:
     
     #Buildings methods
     def set_build_gdf_in_mos(self, mosaic_name):
-        self.mosaics[mosaic_name].set_build_gdf(self.buildings_ds_links_path)
+        self.mosaics[mosaic_name].set_build_gdf()
 
     def set_build_gdf_all_mos(self):
         for mosaic_name, mosaic in self.mosaics.items():

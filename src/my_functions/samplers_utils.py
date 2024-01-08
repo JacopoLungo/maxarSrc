@@ -2,6 +2,7 @@ import os
 import json
 import shapely
 from typing import List
+from pathlib import Path
 #import geopandas as gpd
 #from my_functions import segment
 
@@ -10,9 +11,16 @@ def path_2_tilePolygon(tile_path, root = '/mnt/data2/vaschetti_data/maxar/metada
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
     """
-    event = tile_path.split('/')[-4]
-    child = tile_path.split('/')[-2]
-    tile = tile_path.split('/')[-1].replace(".tif", "")
+    if isinstance(tile_path, str):
+        event = tile_path.split('/')[-4]
+        child = tile_path.split('/')[-2]
+        tile = tile_path.split('/')[-1].replace(".tif", "")
+    elif isinstance(tile_path, Path):
+        event = tile_path.parts[-4]
+        child = tile_path.parts[-2]
+        tile = tile_path.parts[-1].replace(".tif", "")
+    else:
+        raise TypeError("tile_path must be a string or a Path object")
     path_2_child_geojson = os.path.join(root, event, child +'.geojson')
     with open(path_2_child_geojson, 'r') as f:
         child_geojson = json.load(f)
