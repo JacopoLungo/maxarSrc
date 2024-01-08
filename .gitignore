@@ -14,3 +14,4 @@ from_github_maxar_metadata/
 *.tsv
 *.jit
 *.pt
+*.code-workspace
