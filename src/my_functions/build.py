@@ -25,14 +25,26 @@ from my_functions.samplers_utils import path_2_tilePolygon
 sys.path.append('/home/vaschetti/maxarSrc/models/EfficientSAM')
 from efficient_sam.build_efficient_sam import build_efficient_sam_vitt
 
+#################
+# Retrieve names 
+#################
+
 def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
+    """
+    Get the region associate with the input event.
+    It is based in the event_id2State2Region.csv file.
+    Input:
+        event_name: Example: 'southafrica-flooding22'
+    Output:
+        region name: Example: 'AfricaSouth-Full'
+    """
     metadata_root = Path(metadata_root)
     df = pd.read_csv(metadata_root / 'evet_id2State2Region.csv')
     return df[df['event_id'] == event_name]['region'].values[0]
 
 def get_all_events(data_root = '/mnt/data2/vaschetti_data/maxar'):#TODO: restituire solo le cartelle che contengono un tiff
     """
-    Get all the events in the data_root folder.
+    Get all the events name in the data_root folder.
     Input:
         data_root: Example: '/mnt/data2/vaschetti_data/maxar'
     Output:
@@ -64,6 +76,11 @@ def get_mosaics_names(event_name, data_root = '/mnt/data2/vaschetti_data/maxar',
             #all_mosaics.append(mosaic_name.split('/')[1])
             all_mosaics.append(os.path.split(mosaic_name)[1])
     return all_mosaics
+
+
+###########################
+# Retrieve bbox coordinates 
+###########################
 
 def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets', extra_mt = 0, return_proj_coords = False):
     """
@@ -180,7 +197,7 @@ def intersecting_qks(bott_left_lon_lat: tuple, top_right_lon_lat: tuple, min_lev
 
 def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
     """
-    Returns a geodataframe with the buildings of the country passed as input.
+    Returns a geodataframe with the buildings in the quadkeys given as input.
     It downloads the dataset from a link in the dataset-links.csv file.
     Coordinates are converted in the crs passed as input.
 
@@ -228,10 +245,10 @@ def get_region_road_gdf(region_name, roads_root = '/mnt/data2/vaschetti_data/MS_
 
     roads_root = Path(roads_root)
     if region_name != 'USA.tsv':
-        print('not USA', region_name)
+        print('not USA: ', region_name)
         region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
     else:
-        print('is USA', region_name)
+        print('is USA: ', region_name)
         region_road_df = pd.read_csv(roads_root/region_name, names =['geometry'], sep='\t')
     #region_road_df['geometry'] = region_road_df['geometry'].apply(json.loads).apply(lambda d: geometry.shape(d.get('geometry')))
     #slightly faster
@@ -319,7 +336,7 @@ def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img
     return np.array(input_pts), np.array(input_lbs) # (batch_size, max_queries, 2, 2), (batch_size, max_queries, 2)
 
 
-
+# TODO: the following functions should be moved in another file
 from groundingdino.util.inference import load_model as GD_load_model
 class SegmentConfig:
     """
@@ -411,14 +428,14 @@ class Mosaic:
     def __str__(self) -> str:
         return self.name
     
-    def get_tile_road_mask_np(self, tile_path): 
+    def get_tile_road_mask_np(self, tile_path, ext_mt = 10):
         with rasterio.open(tile_path) as src:
             transform = src.transform
             tile_h = src.height
             tile_w = src.width
             out_meta = src.meta.copy()
         query_bbox_poly = path_2_tilePolygon(tile_path)
-        road_lines = self.proj_roads_gdf[self.proj_roads_gdf.geometry.intersects(query_bbox_poly)]
+        road_lines = self.proj_road_gdf[self.proj_road_gdf.geometry.intersects(query_bbox_poly)]
 
         if len(road_lines) != 0:
             buffered_lines = road_lines.geometry.buffer(ext_mt)
@@ -439,7 +456,7 @@ class Mosaic:
 
         for batch in tqdm(dataloader):          
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
-            tree_boxes_b = segment.get_GD_boxes(img_b,
+            tree_boxes_b, num_trees4img = segment.get_GD_boxes(img_b,
                                                 seg_config.GD_model,
                                                 seg_config.TEXT_PROMPT,
                                                 seg_config.BOX_TRESHOLD,
@@ -447,7 +464,7 @@ class Mosaic:
                                                 dataset.res,
                                                 max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
             
-            building_boxes_b = segment.get_batch_buildings_boxes(batch['bbox'],
+            building_boxes_b, num_build4img = segment.get_batch_buildings_boxes(batch['bbox'],
                                                                 proj_buildings_gdf = self.proj_build_gdf,
                                                                 dataset_res = dataset.res,
                                                                 ext_mt = 10)
@@ -462,28 +479,6 @@ class Mosaic:
             #print(img_b.shape)
         
         #TODO: salvare la canvas come tiff
-    
-    """def segment_tile(self, tile_path, batch_size, seg_model, detect_model, size = 600, stride = 300):
-        dataset = geoDatasets.Maxar(str(tile_path))
-        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=batch_size, size=size, stride=stride)
-        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
-
-        canvas = np.zeros((dataset.height, dataset.width, 3), dtype=np.uint8)
-
-        for batch in tqdm(dataloader):          
-            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
-            tree_boxes_b = segment.get_GD_boxes(img_b, GDINO_model, TEXT_PROMPT, BOX_TRESHOLD, TEXT_TRESHOLD, dataset.res, max_area_mt2 =3000)
-            building_boxes_b = None
-            tree_and_building_mask_b = None
-            road_mask_b = None
-
-
-            #fig, axs = plt.subplots(1, batch_size, figsize=(30, 30))
-            #for i in range(batch_size):
-            #    axs[i].imshow(img_b[i])
-            #print(img_b.shape)
-        
-        #TODO: salvare la canvas come tiff"""
 
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:

@@ -380,7 +380,7 @@ def clean_mask(road_lines: Union[LineString, List[LineString]],
 # Roads with buffer
 #############
 
-
+# Method not used in the final version
 def get_road_masks_b(query_bbox_b, proj_roads_gdf: gpd.GeoDataFrame, sample_size, dataset_res, ext_mt = 10):
     for bbox in query_bbox_b:
         query_bbox_poly = boundingBox_2_Polygon(bbox)
