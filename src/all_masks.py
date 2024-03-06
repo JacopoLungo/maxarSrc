@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import supervision as sv
 import torch
 sys.path.append('/home/vaschetti/maxarSrc/creating_labels/MSBuildings')
-from my_functions.segment import building_gdf, rel_bbox_coords, rel_polyg_coord, segment_buildings
+from my_functions.segment.segment import building_gdf, rel_bbox_coords, rel_polyg_coord, segment_buildings
 sys.path.append('/home/vaschetti/maxarSrc/creating_labels/MSRoads')
 from road_seg_utils import rel_road_lines, segment_roads, line2points, get_offset_lines, clear_roads, plotPoints, rmv_pts_out_img
 import json

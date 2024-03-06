@@ -1,0 +1,78 @@
+import os
+import json
+import shapely
+from typing import List
+from pathlib import Path
+import numpy as np
+import geopandas as gpd
+#from my_functions import segment
+
+def path_2_tilePolygon(tile_path, root = '/mnt/data2/vaschetti_data/maxar/metadata/from_github/datasets' ):
+    """
+    Create a shapely Polygon from a tile_path
+    Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
+    """
+    if isinstance(tile_path, str):
+        event = tile_path.split('/')[-4]
+        child = tile_path.split('/')[-2]
+        tile = tile_path.split('/')[-1].replace(".tif", "")
+    elif isinstance(tile_path, Path):
+        event = tile_path.parts[-4]
+        child = tile_path.parts[-2]
+        tile = tile_path.parts[-1].replace(".tif", "")
+    else:
+        raise TypeError("tile_path must be a string or a Path object")
+    path_2_child_geojson = os.path.join(root, event, child +'.geojson')
+    with open(path_2_child_geojson, 'r') as f:
+        child_geojson = json.load(f)
+    j = [el["properties"]["proj:geometry"] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
+    tile_polyg = shapely.geometry.shape(j)
+    return tile_polyg
+
+def boundingBox_2_Polygon(bounding_box):
+    """
+    Create a shapely Polygon from a BoundingBox
+    """
+    minx, miny, maxx, maxy = bounding_box.minx, bounding_box.miny, bounding_box.maxx, bounding_box.maxy
+    vertices = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny)]
+    bbox_polyg = shapely.geometry.Polygon(vertices)
+    return bbox_polyg
+
+def boundingBox_2_centralPoint(bounding_box):
+    """
+    Create a shapely Point from a BoundingBox
+    """
+    minx, miny, maxx, maxy = bounding_box.minx, bounding_box.miny, bounding_box.maxx, bounding_box.maxy
+    return shapely.geometry.Point((minx + maxx)/2, (miny + maxy)/2)
+    
+def rel_bbox_coords(geodf:gpd.GeoDataFrame,
+                    ref_coords:tuple,
+                    res,
+                    ext_mt = None):
+    """
+    Returns the relative coordinates of a bbox w.r.t. a reference bbox in the 'geometry' column.
+    Goes from absolute geo coords to relative coords in the image.
+
+    Inputs:
+        geodf: dataframe with bboxes
+        ref_coords: a tuple in the format (minx, miny, maxx, maxy)
+        res: resolution of the image
+        ext_mt: meters to add to each edge of the box (the center remains fixed)
+    Returns:
+        a list of tuples with the relative coordinates of the bboxes [(minx, miny, maxx, maxy), ...]
+    """
+    result = []
+    ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the square sample extracted from the tile
+    #print('\nref_coords top left: ', ref_minx, ref_maxy )
+    for geom in geodf['geometry']:
+        building_minx, building_miny, building_maxx, building_maxy = geom.bounds
+        if ext_mt != None:
+            building_minx -= (ext_mt / 2)
+            building_miny -= (ext_mt / 2)
+            building_maxx += (ext_mt / 2)
+            building_maxy += (ext_mt / 2)
+
+        rel_bbox_coords = list(np.array([building_minx - ref_minx, ref_maxy - building_maxy, building_maxx - ref_minx, ref_maxy - building_miny]) / res)
+        result.append(rel_bbox_coords)
+    
+    return result
