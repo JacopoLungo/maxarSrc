@@ -37,7 +37,7 @@ class SegmentConfig:
         self.CONFIG_PATH = self.GD_root / GD_config_file
         self.WEIGHTS_PATH = self.GD_root / GD_weights
 
-        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH, device = self.device).to(self.device)
+        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH).to(self.device)
         print('- GD model device:', next(self.GD_model.parameters()).device)
         self.TEXT_PROMPT = TEXT_PROMPT
         self.BOX_THRESHOLD = BOX_THRESHOLD
@@ -47,6 +47,3 @@ class SegmentConfig:
         #Efficient SAM
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
-        
-
-        #Roads

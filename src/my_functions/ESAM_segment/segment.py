@@ -56,7 +56,7 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
                                                                 output_w=input_w)
         
         if i == 0:
-            print('predicetd_logits:', predicted_logits.shape)
+            #print('predicetd_logits:', predicted_logits.shape)
             np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
         else:
             np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
@@ -64,4 +64,4 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
             del predicted_logits, predicted_iou
             torch.cuda.empty_cache()
     
-    return np_complete_masks
+    return np_complete_masks #shape (b, masks, h, w)

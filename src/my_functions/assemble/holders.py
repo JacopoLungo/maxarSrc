@@ -116,6 +116,8 @@ class Mosaic:
             #print(img_b.shape)
         
         #TODO: salvare la canvas come tiff
+        
+    
 
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:

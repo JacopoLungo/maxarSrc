@@ -3,10 +3,13 @@ from shapely.geometry import LineString, Point
 from typing import Union, List
 import numpy as np
 
-def show_mask(mask: np.array, ax, rgb_color=[30, 144, 255], alpha = 0.6, random_color = False):
+def show_mask(mask: np.array, ax = None, rgb_color=[30, 144, 255], alpha = 0.6, random_color = False):
     """
     Take a mask that is a 2D array and show it on the axis ax
     """
+    if ax is None:
+        fig, ax = plt.subplots()
+        
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
@@ -55,28 +58,17 @@ def show_points(coords: np.array, labels: np.array, ax, marker_size=75):
         ax.scatter(pos_points[:, 0], pos_points[:, 1], color='blue', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
         ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='.', s=marker_size, edgecolor='white', linewidth=0.25)
 
-def plotShapelyPoints(points: Union[List[Point], Point], ax, color = 'red', markersize = 5):
-    """
-    #! NON usare questo ma solo show_points
-    Plots a single or a list of shapely points
-    """
-    
-    if not isinstance(points, list):
-        points = [points]
-
-    for point in points:
-        x, y = point.xy
-        ax.plot(x, y, 'o', color = color, markersize = markersize)
-
 def plot_comparison(img, masks, alpha = 0.6):
     """
     Plot a comparison between the original image and the image with the masks.
     Inputs:
         img: the original image (np.array of dim (h, w, 3))
-        masks: a list of masks (np.array of dim (#masks, h, w)
+        masks: a np.array of masks (dim: (#masks, h, w) or (h, w))
         alpha: the opacity of the masks
     """
-
+    if len(masks.shape) != 3:
+        masks = np.expand_dims(masks, axis = 0)
+    
     fig = plt.figure(figsize=(15, 15))
     ax1 = fig.add_subplot(1, 2, 1)
     ax1.imshow(img)
@@ -91,3 +83,12 @@ def plot_comparison(img, masks, alpha = 0.6):
 
     ax1.axis('off')
     ax2.axis('off')
+    
+def show_img(img, ax = None):
+    """
+    Show an image on the axis ax
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.imshow(img)
+    ax.axis('off')

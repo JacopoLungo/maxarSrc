@@ -22,11 +22,11 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
     for img in img_batch:
         image_transformed = detect_utils.GD_img_load(img)
         tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_THRESHOLD, TEXT_THRESHOLD, device = device)
-        num_trees4img.append(len(tree_boxes))
         tree_boxes4Sam = []
         if len(tree_boxes) != 0:
             keep_ix_tree_boxes = detect_utils.filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
             tree_boxes4Sam = detect_utils.GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
+            num_trees4img.append(tree_boxes4Sam.shape[0])
             batch_tree_boxes4Sam.append(tree_boxes4Sam)
     return batch_tree_boxes4Sam, np.array(num_trees4img)
 
