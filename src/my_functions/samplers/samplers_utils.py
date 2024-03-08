@@ -5,6 +5,7 @@ from typing import List
 from pathlib import Path
 import numpy as np
 import geopandas as gpd
+from my_functions.geo_datasets import geoDatasets
 #from my_functions import segment
 
 def path_2_tilePolygon(tile_path, root = '/mnt/data2/vaschetti_data/maxar/metadata/from_github/datasets' ):
@@ -76,3 +77,17 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
         result.append(rel_bbox_coords)
     
     return result
+
+def tile_sizes(dataset: geoDatasets.MxrSingleTile):
+    """
+    Returns the sizes of the tile given the path
+    It uses the 
+    """
+    bounds = dataset.bounds
+    x_size_pxl = (bounds.maxy - bounds.miny) / dataset.res
+    y_size_pxl = (bounds.maxx - bounds.minx) / dataset.res
+    
+    if x_size_pxl % 1 != 0 or y_size_pxl % 1 != 0:
+        raise ValueError("The sizes of the tile are not integers")
+        
+    return (int(x_size_pxl), int(y_size_pxl))
