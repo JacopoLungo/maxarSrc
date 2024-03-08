@@ -43,25 +43,30 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
     image_embeddings = efficient_sam.get_image_embeddings(img_b_tsr)
     
     stop = input_points.shape[1]
-    for i in range(0, stop , num_parall_queries):
-        start_idx = i
-        end_idx = min(i + num_parall_queries, stop)
-        predicted_logits, predicted_iou = efficient_sam.predict_masks(image_embeddings,
-                                                                input_points[:, start_idx: end_idx],
-                                                                input_labels[:, start_idx: end_idx],
-                                                                multimask_output=True,
-                                                                input_h = input_h,
-                                                                input_w = input_w,
-                                                                output_h=input_h,
-                                                                output_w=input_w)
+    if stop > 0: #if there is at least a query in a single image in the batch
+        for i in range(0, stop , num_parall_queries):
+            start_idx = i
+            end_idx = min(i + num_parall_queries, stop)
+            predicted_logits, predicted_iou = efficient_sam.predict_masks(image_embeddings,
+                                                                    input_points[:, start_idx: end_idx],
+                                                                    input_labels[:, start_idx: end_idx],
+                                                                    multimask_output=True,
+                                                                    input_h = input_h,
+                                                                    input_w = input_w,
+                                                                    output_h=input_h,
+                                                                    output_w=input_w)
+            
+            if i == 0:
+                #print('predicetd_logits:', predicted_logits.shape)
+                np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
+            else:
+                np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
+            
+            if empty_cuda_cache:
+                del predicted_logits, predicted_iou
+                torch.cuda.empty_cache()
+    else: #if there are no queries (in any image in the batch)
+        np_complete_masks = np.ones((batch_size, 0, input_h, input_w)) * -1 #equal to set False on all the mask
         
-        if i == 0:
-            #print('predicetd_logits:', predicted_logits.shape)
-            np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
-        else:
-            np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
-        if empty_cuda_cache:
-            del predicted_logits, predicted_iou
-            torch.cuda.empty_cache()
     
     return np_complete_masks #shape (b, masks, h, w)

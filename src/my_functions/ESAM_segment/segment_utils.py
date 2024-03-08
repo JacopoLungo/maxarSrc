@@ -11,7 +11,7 @@ def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img
     for tree_detec, build_detec in zip(tree_boxes_b, building_boxes_b):
         tree_build_detect = np.concatenate((tree_detec, build_detec)) #(query_img_x, 4)
         num_query_img_x = tree_build_detect.shape[0]
-        lbs = np.array([[2,3]] * num_query_img_x) #(query_img_x, 2)
+        lbs = np.array([[2,3]] * num_query_img_x).reshape(-1,2) #(query_img_x, 2)
 
         pad_len = max_detect - num_query_img_x
         pad_width = ((0,pad_len),(0, 0))
@@ -74,6 +74,7 @@ def discern_mode(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np
     all_mask_b = np.greater_equal(all_mask_b, 0) #from logits to bool
     
     
+    
     for all_mask, tree_ix, build_ix in zip (all_mask_b, num_trees4img, num_build4img):
         #all_mask.shape = (num_mask, h, w)
         tree_mask = all_mask[ : tree_ix].any(axis=0) # Squash the tree masks. Get shape (h, w)
@@ -127,17 +128,19 @@ def write_canvas(canvas: np.array,
     """
     Write the patmasks in the canvas
     Inputs:
-        canvas: np.array of shape (masks, h_tile, w_tile)
+        canvas: np.array of shape (channel, h_tile, w_tile)
         patch_masks_b: np.array of shape (b, channel, h_patch, w_patch)
         img_ixs: np.array of shape (b,)
     """
     size = patch_masks_b.shape[-1]
-    for i, patch_mask in zip(img_ixs, patch_masks_b):
-        rows_changed = img_ixs[i] // total_cols
-        cols_changed = img_ixs[i] % total_cols
-        
-        inv_base = (canvas.shape[0] - 1 - size) - (stride * rows_changed)
-        base = (stride * cols_changed)        
-        canvas[:, inv_base: inv_base + size, base: base + size] = patch_mask[i]
+    #print("img_ixs", img_ixs)
+    for img_ix, patch_mask in zip(img_ixs, patch_masks_b):
+        rows_changed = img_ix // total_cols
+        cols_changed = img_ix % total_cols
+        inv_base = (canvas.shape[1] - 1 - size) - (stride * rows_changed)
+        base = (stride * cols_changed)
+        #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
+        #print('patch', patch_mask.shape)
+        canvas[:, inv_base: inv_base + size, base: base + size] = patch_mask
 
     return canvas

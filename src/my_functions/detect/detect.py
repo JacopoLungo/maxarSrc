@@ -23,7 +23,7 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
         image_transformed = detect_utils.GD_img_load(img)
         tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_THRESHOLD, TEXT_THRESHOLD, device = device)
         tree_boxes4Sam = []
-        if len(tree_boxes) != 0:
+        if len(tree_boxes) > 0:
             keep_ix_tree_boxes = detect_utils.filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
             tree_boxes4Sam = detect_utils.GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
             num_trees4img.append(tree_boxes4Sam.shape[0])
@@ -38,10 +38,13 @@ def get_batch_buildings_boxes(batch_bbox: List, proj_buildings_gdf: gpd.GeoDataF
         index_MS_buildings = proj_buildings_gdf.sindex
         buildig_hits = index_MS_buildings.query(query_bbox_poly)
         num_build4img.append(len(buildig_hits))
-        building_boxes = [] #append empty list if no buildings
+        building_boxes = [] 
         if len(buildig_hits) > 0:
             building_boxes = samplers_utils.rel_bbox_coords(proj_buildings_gdf.iloc[buildig_hits], query_bbox_poly.bounds, dataset_res, ext_mt=ext_mt)
-
-        batch_building_boxes.append(np.array(building_boxes))
+            building_boxes = np.array(building_boxes)
+        else: #append empty array if no buildings
+            building_boxes = np.empty((0,4))
+        
+        batch_building_boxes.append(building_boxes)
 
     return batch_building_boxes, np.array(num_build4img)
