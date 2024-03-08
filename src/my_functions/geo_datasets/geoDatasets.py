@@ -9,6 +9,97 @@ import sys
 
 
 #TODO: pulire il codice sotto dai commenti
+class MxrSingleTile(RasterDataset):
+    filename_glob = "*.tif"
+    is_image = True
+    parent_tile_bbox_in_item = False #this is a parameter to chose if we want to include the parent tile bbox in the return of __getitem__
+
+    def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
+        """Retrieve image/mask and metadata indexed by query.
+
+        Args:
+            query: (minx, maxx, miny, maxy, mint, maxt) coordinates to index
+
+        Returns:
+            sample of image/mask and metadata at that index
+
+        Raises:
+            IndexError: if query is not found in the index
+        """
+        hits = self.index.intersection(tuple(query), objects=True)
+        filepaths = cast(list[str], [hit.object for hit in hits])
+
+        if not filepaths:
+            raise IndexError(
+                f"query: {query} not found in index with bounds: {self.bounds}"
+            )
+
+        data = self._merge_files(filepaths, query, self.band_indexes)
+
+        sample = {"crs": self.crs, "bbox": query}
+
+        data = data.to(self.dtype)
+
+        if self.is_image:
+            sample["image"] = data
+        else:
+            sample["mask"] = data
+
+        if self.transforms is not None:
+            sample = self.transforms(sample)
+
+        if self.parent_tile_bbox_in_item:
+            #initialize bbox
+            minx = sys.float_info.max
+            maxx = -sys.float_info.max
+            miny = sys.float_info.max
+            maxy = -sys.float_info.max
+            mint = sys.float_info.max
+            maxt = -sys.float_info.max
+
+            #if there are multiple hits (tiles) take the largest bbox (include both tiles)
+            for hit in hits:
+                minx = min(minx, hit[0].minx)
+                maxx = max(maxx, hit[1].maxx)
+                miny = min(miny, hit[2].miny)
+                maxy = max(maxy, hit[3].maxy)
+                mint = min(mint, hit[4].mint)
+                maxt = max(maxt, hit[5].maxt)
+
+
+            sample['parent_tile_bbox'] = BoundingBox(minx, maxx, miny, maxy, mint, maxt)
+
+
+        return sample
+
+    def set_parent_tile_bbox_in_item(self):
+        self.parent_tile_bbox_in_item = True
+
+
+    #tr = Transformer.from_crs("EPSG:32628", "EPSG:4326")
+    def plot(self, sample):
+        # Find the correct band index order
+        #rgb_indices = []
+        #for band in self.rgb_bands:
+        #    rgb_indices.append(self.all_bands.index(band))
+
+        # Reorder and rescale the image
+        #tr = Transformer.from_crs("EPSG:32628", "EPSG:4326")
+        minx, maxx, miny, maxy = sample["bbox"].minx, sample["bbox"].maxx, sample["bbox"].miny, sample["bbox"].maxy
+        #sx_low =  tr.transform(minx, miny)
+        #dx_high = tr.transform(maxx, maxy)
+        print('In plot')
+        print('Crs', self.crs)
+        print('sx_low: ', (minx, miny))
+        print('dx_high: ', (maxx, maxy))
+        image = sample["image"].permute(1, 2, 0).numpy().astype('uint8')
+
+        # Plot the image
+        fig, ax = plt.subplots()
+        ax.imshow(image)
+
+        return fig, ax
+    
 class Maxar(RasterDataset):
     filename_glob = "*.tif"
     is_image = True
