@@ -85,43 +85,96 @@ class Mosaic:
     def segment_tile(self, tile_path):
         seg_config = self.event.seg_config
 
-        dataset = geoDatasets.Maxar(str(tile_path))
-        sampler = samplers.MyBatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
+        dataset = geoDatasets.MxrSingleTile(str(tile_path))
+        sampler = samplers.WholeTifGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
-        canvas = np.zeros((seg_config.size, seg_config.size, 3), dtype=np.uint8)
+        canvas = np.zeros((3,) + samplers_utils.tile_sizes(dataset), dtype=np.uint8) #dim (3, h_tile, w_tile). The first dim is tree, build, pad
+        
+        all_batches_img_ixs = np.arange(len(sampler)).reshape((-1, batch_size))
+        _, total_cols = sampler.get_num_rows_cols()
+        
+        i = 0
+        f_i = 50
+        start_time_all = time()
+        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
+            i+=1
+            original_img_tsr = batch['image']
+            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8') #TODO: l'immagine viene convertita in numpy ma magari è meglio lasciarla in tensor
 
-        for batch in tqdm(dataloader):          
-            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
+            #trees
+            GD_t_0 = time()
+            
+            #get the tree boxes in batches and the number of trees for each image
             tree_boxes_b, num_trees4img = detect.get_GD_boxes(img_b,
                                                 seg_config.GD_model,
                                                 seg_config.TEXT_PROMPT,
-                                                seg_config.BOX_TRESHOLD,
-                                                seg_config.TEXT_TRESHOLD,
+                                                seg_config.BOX_THRESHOLD,
+                                                seg_config.TEXT_THRESHOLD,
                                                 dataset.res,
+                                                device = seg_config.device,
                                                 max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
+            #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
             
-            building_boxes_b, num_build4img = segment.get_batch_buildings_boxes(batch['bbox'],
-                                                                proj_buildings_gdf = self.proj_build_gdf,
-                                                                dataset_res = dataset.res,
-                                                                ext_mt = 10)
-            tree_and_building_mask_b = None
-            road_mask_b = None
-            all_mask_b = None
+            #print('GD_time: ', time() - GD_t_0)
 
-
-            #fig, axs = plt.subplots(1, batch_size, figsize=(30, 30))
-            #for i in range(batch_size):
-            #    axs[i].imshow(img_b[i])
-            #print(img_b.shape)
-        
-        #TODO: salvare la canvas come tiff
+            #get the building boxes in batches and the number of buildings for each image
+            building_boxes_b, num_build4img = detect.get_batch_buildings_boxes(batch['bbox'],
+                                                                        proj_buildings_gdf = self.proj_build_gdf,
+                                                                        dataset_res = dataset.res,
+                                                                        ext_mt = 10)
+            
+            #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
+            
+            max_detect = max(num_trees4img + num_build4img)
+            
+            #print("\n__________________________")
+            #print("Batch number: ", i)
+            #print(f'Num detections in batch per img: {num_trees4img + num_build4img}')
+            
+            #obtain the right input for the ESAM model (trees + buildings)
+            input_points, input_labels = segment_utils.get_input_pts_and_lbs(tree_boxes_b, building_boxes_b, max_detect)
+            
+            # segment the image and get for each image as many masks as the number of boxes,
+            # for GPU constraint use num_parall_queries
+            all_masks_b = segment.ESAM_from_inputs(original_img_tsr,
+                                                    torch.from_numpy(input_points),
+                                                    torch.from_numpy(input_labels),
+                                                    efficient_sam = seg_config.efficient_sam,
+                                                    device = seg_config.device,
+                                                    num_parall_queries = 5)
+            
+            
+            #for each image, discern the masks in trees, buildings and padding
+            patch_masks_b = segment_utils.discern_mode(all_masks_b, num_trees4img, num_build4img, mode = 'bchw')
+            
+            canvas = segment_utils.write_canvas(canvas = canvas,
+                                                patch_masks_b =  patch_masks_b,
+                                                img_ixs = all_batches_img_ixs[batch_ix],
+                                                stride = seg_config.stride,
+                                                total_cols = total_cols)
+            
+            if i == f_i:
+                break
+            
+        #print(f'\nTotal Time for {seg_config.batch_size * i} images: ', time() - start_time_all)
+        return canvas
         
     
-
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
             self.segment_tile(tile_path)
+    
+    def single_mask2Tif(tile_path, mask, out_name, out_path_root = '/home/vaschetti/maxarSrc/output'):
+        with rasterio.open(tile_path) as src:
+            out_meta = src.meta.copy()
+        
+        out_meta.update({"driver": "GTiff",
+                        "dtype": "uint8",
+                        "count": 1})
+        out_path = out_path_root + '/'+ out_name
+        with rasterio.open(out_path, 'w', **out_meta) as dest:
+                dest.write(mask, 1) 
 
 
 class Event:
