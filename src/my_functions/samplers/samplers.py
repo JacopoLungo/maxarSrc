@@ -80,8 +80,8 @@ class MyGridGeoSampler(GridGeoSampler):
             tile_path = hit.object
             tile_polygon = path_2_tilePolygon(tile_path)
 
-            print('In sampler') #TODO: togliere le print quando usato davvero
-            print('tile_polygon: ', tile_polygon)
+            #print('In sampler')
+            #print('tile_polygon: ', tile_polygon)
 
             bounds = BoundingBox(*hit.bounds)
             rows, cols = tile_to_chips(bounds, self.size, self.stride)
@@ -130,8 +130,8 @@ class MyBatchGridGeoSampler(GridGeoSampler):
             tile_path = hit.object
             tile_polygon = path_2_tilePolygon(tile_path)
 
-            print('In sampler') #TODO: togliere le print quando usato davvero
-            print('tile_polygon: ', tile_polygon)
+            #print('In sampler')
+            #print('tile_polygon: ', tile_polygon)
 
             bounds = BoundingBox(*hit.bounds)
             rows, cols = tile_to_chips(bounds, self.size, self.stride)
@@ -205,9 +205,6 @@ class WholeTifGridGeoSampler(GridGeoSampler):
             tile_path = hit.object
             tile_polygon = path_2_tilePolygon(tile_path)
 
-            print('In sampler') #TODO: togliere le print quando usato davvero
-            print('tile_polygon: ', tile_polygon)
-
             bounds = BoundingBox(*hit.bounds)
             rows, cols = tile_to_chips(bounds, self.size, self.stride)
             mint = bounds.mint
@@ -246,8 +243,8 @@ class WholeTifGridGeoSampler(GridGeoSampler):
 
                         yield batch
                         batch = []
-        print('Valid chips: ', valid_chips)
-        print('Empty chips: ', empty_chips)
+        print('Valid patches: ', valid_chips)
+        print('Empty patches: ', empty_chips)
 
     def __len__(self) -> int:
         """Return the number of batches in a single epoch.

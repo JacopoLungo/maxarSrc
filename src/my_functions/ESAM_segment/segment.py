@@ -1,26 +1,3 @@
-#import pandas as pd
-#import geopandas as gpd
-#from shapely.geometry import shape, Polygon, LineString, MultiPoint, Point
-#import sys
-#sys.path.append('/home/vaschetti/maxarSrc/datasets_and_samplers')
-#from my_functions.build.geoDatasets import Maxar
-#from my_functions.samplers import MyGridGeoSampler
-#from torch.utils.data import DataLoader
-#from torchgeo.datasets import stack_samples, unbind_samples
-#from my_functions.samplers_utils import boundingBox_2_Polygon
-#import matplotlib.patches as patches
-#import matplotlib.pyplot as plt
-#import cv2
-#import supervision as sv
-#import groundingdino.datasets.transforms as T
-#from PIL import Image
-#from torchvision.ops import box_convert
-#from typing import Union, List
-#from torchvision import transforms
-#from rasterio.features import rasterize
-
-
-
 import numpy as np
 import torch
 
@@ -47,6 +24,7 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
         for i in range(0, stop , num_parall_queries):
             start_idx = i
             end_idx = min(i + num_parall_queries, stop)
+            #TODO: check if multimask_output False is faster
             predicted_logits, predicted_iou = efficient_sam.predict_masks(image_embeddings,
                                                                     input_points[:, start_idx: end_idx],
                                                                     input_labels[:, start_idx: end_idx],
@@ -61,7 +39,7 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
                 np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
             else:
                 np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
-            
+            #TODO: check if empty_cuda_cache Fasle is faster
             if empty_cuda_cache:
                 del predicted_logits, predicted_iou
                 torch.cuda.empty_cache()

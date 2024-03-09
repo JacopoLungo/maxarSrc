@@ -112,13 +112,18 @@ def rmv_mask_overlap(overlapping_masks: np.array):
     Remove overlapping between the masks. Giving priority according to the inverse of the order of
     the masks.
     Third (building) mask has priority over second (trees) mask, and so on.
+    Inputs:
+        overlapping_masks: np.array of shape (c, h, w)
+    Outputs:
+        no_overlap_masks: np.array of shape (c, h, w)
     """
-    disjoined_masks = np.copy(overlapping_masks)
+    no_overlap_masks = np.copy(overlapping_masks)
     for i in range(overlapping_masks.shape[0] - 1):
         sum_mask = np.sum(overlapping_masks[i:], axis=0)
-        disjoined_masks[i] = np.where(sum_mask > 1, False, overlapping_masks[i])
+        no_overlap_masks[i] = np.where(sum_mask > 1, False, overlapping_masks[i])
 
-    return disjoined_masks
+    return no_overlap_masks
+
 
 def write_canvas(canvas: np.array,
                  patch_masks_b: np.array,
@@ -139,8 +144,9 @@ def write_canvas(canvas: np.array,
         cols_changed = img_ix % total_cols
         inv_base = (canvas.shape[1] - 1 - size) - (stride * rows_changed)
         base = (stride * cols_changed)
+        canva_writable_space = canvas[:, inv_base: inv_base + size, base: base + size].shape[1:] #useful when reached the border of the canva
         #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
-        #print('patch', patch_mask.shape)
-        canvas[:, inv_base: inv_base + size, base: base + size] = patch_mask
+        #print('patch', patch_mask[:, :canva_writable_space[0], :canva_writable_space[1]].shape)
+        canvas[:, inv_base: inv_base + size, base: base + size] = patch_mask[:, :canva_writable_space[0], :canva_writable_space[1]]
 
     return canvas

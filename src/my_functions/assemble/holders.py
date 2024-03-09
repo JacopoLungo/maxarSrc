@@ -4,6 +4,7 @@ from pathlib import Path
 from my_functions import samplers
 from tqdm import tqdm
 import numpy as np
+import torch
 
 #from my_functions.segment import segment
 from my_functions.detect import detect
@@ -163,18 +164,7 @@ class Mosaic:
     
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
-            self.segment_tile(tile_path)
-    
-    def single_mask2Tif(tile_path, mask, out_name, out_path_root = '/home/vaschetti/maxarSrc/output'):
-        with rasterio.open(tile_path) as src:
-            out_meta = src.meta.copy()
-        
-        out_meta.update({"driver": "GTiff",
-                        "dtype": "uint8",
-                        "count": 1})
-        out_path = out_path_root + '/'+ out_name
-        with rasterio.open(out_path, 'w', **out_meta) as dest:
-                dest.write(mask, 1) 
+            self.segment_tile(tile_path) 
 
 
 class Event:
