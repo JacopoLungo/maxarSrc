@@ -191,9 +191,9 @@ class Mosaic:
         
         ev_name, tl_when, tl_name = tile_path.parts[-3:]
         masks_names = ['road', 'tree', 'building']
-        out_paths = [Path(output_root_path) / ev_name/ tl_when /(tl_name + '_' + mask_name + '.tif') for mask_name in masks_names]
+        out_names = [Path(ev_name) / tl_when / (tl_name + '_' + mask_name + '.tif') for mask_name in masks_names]
         if not overwrite:
-            for out_path in out_paths:
+            for out_path in out_names:
                 assert not os.path.exists(out_path), f'File {out_path} already exists'
         
         tree_and_build_mask = self.seg_tree_and_build_tile(tile_path)
@@ -204,8 +204,8 @@ class Mosaic:
         
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         
-        for i, out_name in enumerate(out_paths):
-            output.single_mask2Tif(tile_path, no_overlap_masks[i], out_name)
+        for i, out_name in enumerate(out_names):
+            output.single_mask2Tif(tile_path, no_overlap_masks[i], out_name = out_name, out_path_root = output_root_path)
     
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
