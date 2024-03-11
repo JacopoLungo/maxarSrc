@@ -1,25 +1,27 @@
-from my_functions.assemble import delimiters
-from my_functions.configs import SegmentConfig
 from pathlib import Path
-from my_functions import samplers
 from tqdm import tqdm
+from time import time
 import numpy as np
-import torch
-
-#from my_functions.segment import segment
-from my_functions.detect import detect
-
 import rasterio
+import warnings
+import torch
+import os
+
 from rasterio.features import rasterize
-from my_functions.samplers.samplers_utils import path_2_tilePolygon
 from torch.utils.data import DataLoader
 from torchgeo.datasets import stack_samples
 
-from my_functions.assemble import filter
-from my_functions.assemble import gen_gdf
+from my_functions.assemble import delimiters, filter, gen_gdf
+from my_functions.ESAM_segment import segment, segment_utils
+from my_functions.samplers import samplers, samplers_utils
 from my_functions.geo_datasets import geoDatasets
+from my_functions.configs import SegmentConfig
 from my_functions.assemble import names
+from my_functions.detect import detect
+from my_functions import output
 
+# Ignore all warnings
+warnings.filterwarnings('ignore')
 
 class Mosaic:
     def __init__(self,
@@ -56,6 +58,7 @@ class Mosaic:
         self.road_gdf = filter.filter_gdf_w_bbox(self.event.road_gdf, self.bbox)
         self.proj_road_gdf =  self.road_gdf.to_crs(self.crs)
         self.road_num = len(self.road_gdf)
+        print(f'Roads in {self.name} mosaic: {self.road_num}')
     
     def set_build_gdf(self):
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
@@ -66,47 +69,57 @@ class Mosaic:
     def __str__(self) -> str:
         return self.name
     
-    def get_tile_road_mask_np(self, tile_path, ext_mt = 10):
+    def seg_road_tile(self, tile_path, road_width_mt = 10) -> np.array:
         with rasterio.open(tile_path) as src:
             transform = src.transform
             tile_h = src.height
             tile_w = src.width
-            out_meta = src.meta.copy()
-        query_bbox_poly = path_2_tilePolygon(tile_path)
+            #out_meta = src.meta.copy()
+        query_bbox_poly = samplers_utils.path_2_tilePolygon(tile_path)
         road_lines = self.proj_road_gdf[self.proj_road_gdf.geometry.intersects(query_bbox_poly)]
 
         if len(road_lines) != 0:
-            buffered_lines = road_lines.geometry.buffer(ext_mt)
+            buffered_lines = road_lines.geometry.buffer(road_width_mt)
             road_mask = rasterize(buffered_lines, out_shape=(tile_h, tile_w), transform=transform)
         else:
             print('No roads')
             road_mask = np.zeros((tile_h, tile_w))
-        return road_mask
-            
-    def segment_tile(self, tile_path):
+        return road_mask  #shape: (h, w)
+    
+    def seg_tree_and_build_tile(self, tile_path):
+        
+        if self.build_gdf is None:
+            self.set_build_gdf()
+        if self.road_gdf is None:
+            self.set_road_gdf()
+        
         seg_config = self.event.seg_config
 
         dataset = geoDatasets.MxrSingleTile(str(tile_path))
         sampler = samplers.WholeTifGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
-        canvas = np.zeros((3,) + samplers_utils.tile_sizes(dataset), dtype=np.uint8) #dim (3, h_tile, w_tile). The first dim is tree, build, pad
+        canvas = np.zeros((3,) + samplers_utils.tile_sizes(dataset), dtype=np.uint8) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
         
-        all_batches_img_ixs = np.arange(len(sampler)).reshape((-1, batch_size))
+        all_batches_img_ixs = np.arange(len(sampler)*seg_config.batch_size).reshape((-1, seg_config.batch_size))
         _, total_cols = sampler.get_num_rows_cols()
+                
+        #TIMERS
+        GD_total = 0
+        build_box_total = 0
+        Esam_total = 0
+        post_proc_total = 0
         
-        i = 0
-        f_i = 50
         start_time_all = time()
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
-            i+=1
             original_img_tsr = batch['image']
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8') #TODO: l'immagine viene convertita in numpy ma magari è meglio lasciarla in tensor
 
             #trees
-            GD_t_0 = time()
+            #GD_t_0 = time()
             
             #get the tree boxes in batches and the number of trees for each image
+            GD_start = time()
             tree_boxes_b, num_trees4img = detect.get_GD_boxes(img_b,
                                                 seg_config.GD_model,
                                                 seg_config.TEXT_PROMPT,
@@ -115,15 +128,18 @@ class Mosaic:
                                                 dataset.res,
                                                 device = seg_config.device,
                                                 max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
+            GD_total += time() - GD_start
             #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
             
             #print('GD_time: ', time() - GD_t_0)
 
             #get the building boxes in batches and the number of buildings for each image
+            build_box_start = time()
             building_boxes_b, num_build4img = detect.get_batch_buildings_boxes(batch['bbox'],
                                                                         proj_buildings_gdf = self.proj_build_gdf,
                                                                         dataset_res = dataset.res,
                                                                         ext_mt = 10)
+            build_box_total += time() - build_box_start
             
             #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
             
@@ -138,15 +154,18 @@ class Mosaic:
             
             # segment the image and get for each image as many masks as the number of boxes,
             # for GPU constraint use num_parall_queries
+            ESAM_start = time()
             all_masks_b = segment.ESAM_from_inputs(original_img_tsr,
                                                     torch.from_numpy(input_points),
                                                     torch.from_numpy(input_labels),
                                                     efficient_sam = seg_config.efficient_sam,
                                                     device = seg_config.device,
-                                                    num_parall_queries = 5)
+                                                    num_parall_queries = seg_config.ESAM_num_parall_queries)
+            Esam_total += time() - ESAM_start
             
             
             #for each image, discern the masks in trees, buildings and padding
+            post_proc_start = time()
             patch_masks_b = segment_utils.discern_mode(all_masks_b, num_trees4img, num_build4img, mode = 'bchw')
             
             canvas = segment_utils.write_canvas(canvas = canvas,
@@ -155,12 +174,38 @@ class Mosaic:
                                                 stride = seg_config.stride,
                                                 total_cols = total_cols)
             
-            if i == f_i:
-                break
+            post_proc_total += time() - post_proc_start
             
-        #print(f'\nTotal Time for {seg_config.batch_size * i} images: ', time() - start_time_all)
+            if batch_ix%100 == 0:
+                print('Avg times (sec/batch)')
+                print(f'- GD: {(GD_total/(batch_ix + 1)):.4f}')
+                print(f'- build_box: {(build_box_total/(batch_ix + 1)):.4f}')
+                print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
+                print(f'- post_proc: {(post_proc_total/(batch_ix + 1)):.4f}')
+                #TODO: aggiundere qui un metodo per debug che ti fa vedere una patch con segmentazione e boxes
+            
+        print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
+    
+    def segment_tile(self, tile_path, output_root_path, overwrite = False):
         
+        ev_name, tl_when, tl_name = tile_path.parts[-3:]
+        masks_names = ['road', 'tree', 'building']
+        out_paths = [Path(output_root_path) / ev_name/ tl_when /(tl_name + '_' + mask_name + '.tif') for mask_name in masks_names]
+        if not overwrite:
+            for out_path in out_paths:
+                assert not os.path.exists(out_path), f'File {out_path} already exists'
+        
+        tree_and_build_mask = self.seg_tree_and_build_tile(tile_path)
+        road_mask = self.seg_road_tile(tile_path)
+        
+        #TODO: aggiungere post processing mask (tappare buchi, cancellare paritcelle)
+        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask[:-1]) , axis = 0)
+        
+        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
+        
+        for i, out_name in enumerate(out_paths):
+            output.single_mask2Tif(tile_path, no_overlap_masks[i], out_name)
     
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
@@ -171,7 +216,7 @@ class Event:
     def __init__(self,
                  name,
                  seg_config: SegmentConfig,
-                 when = 'pre', #'pre', 'post' or None
+                 when = 'pre', #'pre', 'post', None or 'None'
                  maxar_root = '/mnt/data2/vaschetti_data/maxar',
                  maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
                  region = 'infer'
@@ -229,3 +274,8 @@ class Event:
 
     def get_mosaic(self, mosaic_name):
         return self.mosaics[mosaic_name]
+    
+    #Segment methods
+    def seg_all_mosaics(self):
+        for __, mosaic in self.mosaics.items():
+            mosaic.segment_all_tiles()
