@@ -187,14 +187,20 @@ class Mosaic:
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
     
-    def segment_tile(self, tile_path, output_root_path, overwrite = False):
+    def segment_tile(self, tile_path, out_dir_root, overwrite = False):
         
-        ev_name, tl_when, tl_name = tile_path.parts[-3:]
+        tile_path = Path(tile_path)
+        out_dir_root = Path(out_dir_root)
+        
+        ev_name, tl_when, mos_name, tl_name = tile_path.parts[-4:]
         masks_names = ['road', 'tree', 'building']
-        out_names = [Path(ev_name) / tl_when / (tl_name + '_' + mask_name + '.tif') for mask_name in masks_names]
+        out_names = [Path(ev_name) / tl_when / mos_name / (tl_name.split('.')[0] + '_' + mask_name + '.tif') for mask_name in masks_names]        
+        
+        (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
+
         if not overwrite:
-            for out_path in out_names:
-                assert not os.path.exists(out_path), f'File {out_path} already exists'
+            for out_name in out_names:
+                assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
         tree_and_build_mask = self.seg_tree_and_build_tile(tile_path)
         road_mask = self.seg_road_tile(tile_path)
@@ -204,8 +210,8 @@ class Mosaic:
         
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         
-        for i, out_name in enumerate(out_names):
-            output.single_mask2Tif(tile_path, no_overlap_masks[i], out_name = out_name, out_path_root = output_root_path)
+        for j, out_name in enumerate(out_names):
+            output.single_mask2Tif(tile_path, no_overlap_masks[j], out_name = out_name, out_dir_root = out_dir_root)
     
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
