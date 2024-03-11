@@ -47,7 +47,7 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
     country_links = building_links_df[building_links_df['QuadKey'].isin(qk_list)]
 
     if not quiet:
-        print(f"Found {len(country_links)} links matching: {qk_list}")
+        print(f"\nBuildings: found {len(country_links)} links matching: {qk_list}")
     if len(country_links) == 0:
         print("No buildings for this region")
         return gpd.GeoDataFrame()
@@ -64,12 +64,14 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
     return gdfs
 
 def get_region_road_gdf(region_name, roads_root = '/mnt/data2/vaschetti_data/MS_roads'):
+    #TODO: cercare di velocizzare la lettura dei dati delle strade
     """
     Get a gdf containing the roads of a region.
     Input:
         region_name: Name of the region. Example: 'AfricaWest-Full'
         roads_root: Root directory of the roads datasets
     """
+    print(f'Roads: reading roads for the whole {region_name} region')
     if region_name[-4:] != '.tsv':
         region_name = region_name + '.tsv'
     
@@ -81,7 +83,7 @@ def get_region_road_gdf(region_name, roads_root = '/mnt/data2/vaschetti_data/MS_
 
     roads_root = Path(roads_root)
     if region_name != 'USA.tsv':
-        print('not USA. Region name:', region_name)
+        print('Roads: not in USA. Region name:', region_name)
         region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
     else:
         print('is USA:', region_name)

@@ -129,7 +129,7 @@ def write_canvas(canvas: np.array,
                  patch_masks_b: np.array,
                  img_ixs: np.array,
                  stride: int,
-                 total_cols: int):
+                 total_cols: int) -> np.array:
     """
     Write the patmasks in the canvas
     Inputs:

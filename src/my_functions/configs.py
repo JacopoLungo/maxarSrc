@@ -24,12 +24,13 @@ class SegmentConfig:
                  BOX_THRESHOLD = 0.15,
                  TEXT_THRESHOLD = 0.30,
                  max_area_GD_boxes_mt2 = 6000,
-                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM'):
+                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
+                 ESAM_num_parall_queries = 5):
         
         #General
         self.batch_size = batch_size
         self.size = size
-        self.stride = stride
+        self.stride = stride # Overlap between each patch = (size - stride)
         self.device = device
 
         #Grounding Dino (Trees)
@@ -38,7 +39,6 @@ class SegmentConfig:
         self.WEIGHTS_PATH = self.GD_root / GD_weights
 
         self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH).to(self.device)
-        print('- GD model device:', next(self.GD_model.parameters()).device)
         self.TEXT_PROMPT = TEXT_PROMPT
         self.BOX_THRESHOLD = BOX_THRESHOLD
         self.TEXT_THRESHOLD = TEXT_THRESHOLD
@@ -46,4 +46,7 @@ class SegmentConfig:
 
         #Efficient SAM
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
+        self.ESAM_num_parall_queries = ESAM_num_parall_queries
+        
+        print('\n- GD model device:', next(self.GD_model.parameters()).device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)

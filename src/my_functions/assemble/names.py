@@ -49,11 +49,13 @@ def get_mosaics_names(event_name, data_root = '/mnt/data2/vaschetti_data/maxar',
     
     data_root = Path(data_root)
     all_mosaics = []
-    if when is not None:
+    if when in ['pre', 'post']:
         for mosaic_name in glob.glob('*', root_dir=data_root/event_name/when):
             all_mosaics.append(mosaic_name)
-    else:
+    elif when is None or when == 'None':
         for mosaic_name in glob.glob('**/*', root_dir=data_root/event_name):
             #all_mosaics.append(mosaic_name.split('/')[1])
             all_mosaics.append(os.path.split(mosaic_name)[1])
+    else:
+        raise ValueError('Variable when must be: "pre", "post" or "None"')
     return all_mosaics
