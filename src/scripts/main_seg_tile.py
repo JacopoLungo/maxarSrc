@@ -43,6 +43,7 @@ def main():
     parser.add_argument('--max_area_GD_boxes_mt2', default = 6000, type = int, help = 'Max area of the boxes for the grounding dino model')
     
     #Buildings
+    parser.add_argument('--building_width_mt', default = 5, type = int, help = 'Width of the building')
     #TODO aggiungere parametri di quanto allargare la bounding box dei buildings
     
     #Roads
@@ -72,7 +73,8 @@ def main():
                            TEXT_THRESHOLD = args.text_threshold,
                            max_area_GD_boxes_mt2 = args.max_area_GD_boxes_mt2,
                            ESAM_root = args.ESAM_root,
-                           ESAM_num_parall_queries = args.ESAM_num_parall_queries)
+                           ESAM_num_parall_queries = args.ESAM_num_parall_queries,
+                           road_width_mt=args.road_width_mt)
     
     event = holders.Event(events_names[args.event_ix], seg_config = config, when=args.when)
     all_mosaics_names = event.all_mosaics_names
