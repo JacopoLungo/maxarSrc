@@ -92,6 +92,38 @@ def discern_mode(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np
         out = np.stack((tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:]), axis=0) # (c, b, h, w) , slice out the first element of dim 1
     return out
 
+def discern_mode_smooth(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.array, mode: str = 'bchw'):
+    """
+    Discern the masks of the trees, buildings and padding from the all_mask_b array
+    Inputs:
+        all_mask_b: np.array of shape (b, masks, h, w)
+        num_trees4img: np.array of shape (b,)
+        num_build4img: np.array of shape (b,)
+        mode: 'bchw' or 'cbhw'. To specify the output dimension. [batch channel height width] or [channel batch height width]
+    
+    Outputs:
+        out: np.array of shape (b, c, h, w) or (c, b, h, w)
+    """
+    h, w = all_mask_b.shape[2:]
+    tree_mask_b = build_mask_b = pad_mask_b = np.full((1, h, w), float('-inf'), dtype=np.float32)
+    
+    for all_mask, tree_ix, build_ix in zip (all_mask_b, num_trees4img, num_build4img):
+        #all_mask.shape = (num_mask, h, w)
+        tree_mask = all_mask[ : tree_ix].max(axis=0, initial = float('-inf')) # Squash the tree masks. Get shape (h, w)
+        tree_mask_b = np.concatenate((tree_mask_b, tree_mask[None, ...]), axis=0) #(b, h, w)
+
+        build_mask = all_mask[tree_ix : (tree_ix + build_ix)].max(axis=0, initial = float('-inf')) # Squash the build masks. Get shape (h, w)
+        build_mask_b = np.concatenate((build_mask_b, build_mask[None, ...]), axis=0)
+         
+        pad_mask = all_mask[(tree_ix + build_ix) : ].max(axis=0, initial = float('-inf'))
+        pad_mask_b = np.concatenate((pad_mask_b, pad_mask[None, ...]), axis=0)
+    
+    if mode == 'bchw':
+        out = np.stack((tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:]), axis=1) # (b, c, h, w) , slice out the first element of dim 1
+    elif mode == 'cbhw':
+        out = np.stack((tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:]), axis=0) # (c, b, h, w) , slice out the first element of dim 1
+    return out
+
 def rmv_mask_b_overlap(overlapping_masks_b: np.array): #(b, c, h, w)
     """
     Remove overlapping between the masks. Giving priority according to the inverse of the order of
@@ -131,7 +163,7 @@ def write_canvas(canvas: np.array,
                  stride: int,
                  total_cols: int) -> np.array:
     """
-    Write the patmasks in the canvas
+    Write the patch masks in the canvas
     Inputs:
         canvas: np.array of shape (channel, h_tile, w_tile)
         patch_masks_b: np.array of shape (b, channel, h_patch, w_patch)
@@ -150,3 +182,32 @@ def write_canvas(canvas: np.array,
         canvas[:, inv_base: inv_base + size, base: base + size] = patch_mask[:, :canva_writable_space[0], :canva_writable_space[1]]
 
     return canvas
+
+def write_canvas_geo(canvas: np.array,
+                    patch_masks_b: np.array,
+                    top_lft_indexes: List,
+                    smooth: bool) -> np.array:
+    """
+    Write the patch masks in the canvas
+    Inputs:
+        canvas: np.array of shape (channel, h_tile, w_tile)
+        patch_masks_b: np.array of shape (b, channel, h_patch, w_patch)
+        img_ixs: np.array of shape (b,)
+        smooth: bool. If True, it expects patch_mask to have logits, otherwise it should contains bools 
+    """
+    size = patch_masks_b.shape[-1]
+    for patch_mask, top_left_index in zip(patch_masks_b, top_lft_indexes):
+        I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size]
+        #max_idxs is useful when reached the border of the canva, it contains the height and width that you can write on the canva
+        max_idxs = canvas[I].shape[1:]
+        
+        #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
+        #print('patch', patch_mask[:, :max_idxs[0], :max_idxs[1]].shape)
+        if smooth:
+            canvas[I] = np.maximum(canvas[I], patch_mask[:, :max_idxs[0], :max_idxs[1]]) #element-wise max between the canva and the patch
+        else:
+            canvas[I] = patch_mask[:, :max_idxs[0], :max_idxs[1]]
+
+    return canvas 
+    
+
