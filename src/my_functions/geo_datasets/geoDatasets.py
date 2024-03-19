@@ -6,10 +6,18 @@ from typing import Any, cast
 from torch import Tensor
 import re
 import sys
+import rasterio as rio
 
 
 #TODO: pulire il codice sotto dai commenti
 class MxrSingleTile(RasterDataset):
+    """
+    A dataset for reading a single tile.
+    Returns a dict with:
+        - crs
+        - bbox of the sampled patch
+        - image patch
+    """
     filename_glob = "*.tif"
     is_image = True
     parent_tile_bbox_in_item = False #this is a parameter to chose if we want to include the parent tile bbox in the return of __getitem__
@@ -75,6 +83,80 @@ class MxrSingleTile(RasterDataset):
     def set_parent_tile_bbox_in_item(self):
         self.parent_tile_bbox_in_item = True
 
+
+    #tr = Transformer.from_crs("EPSG:32628", "EPSG:4326")
+    def plot(self, sample):
+        # Find the correct band index order
+        #rgb_indices = []
+        #for band in self.rgb_bands:
+        #    rgb_indices.append(self.all_bands.index(band))
+
+        # Reorder and rescale the image
+        #tr = Transformer.from_crs("EPSG:32628", "EPSG:4326")
+        minx, maxx, miny, maxy = sample["bbox"].minx, sample["bbox"].maxx, sample["bbox"].miny, sample["bbox"].maxy
+        #sx_low =  tr.transform(minx, miny)
+        #dx_high = tr.transform(maxx, maxy)
+        print('In plot')
+        print('Crs', self.crs)
+        print('sx_low: ', (minx, miny))
+        print('dx_high: ', (maxx, maxy))
+        image = sample["image"].permute(1, 2, 0).numpy().astype('uint8')
+
+        # Plot the image
+        fig, ax = plt.subplots()
+        ax.imshow(image)
+
+        return fig, ax
+    
+class MxrSingleTileNoEmpty(RasterDataset):
+    """
+    A dataset for reading a single tile.
+    Returns a dict with:
+        - crs
+        - bbox of the sampled patch
+        - offset
+        - image patch
+    """
+    super
+    filename_glob = "*.tif"
+    is_image = True
+    def __init__(self, paths):
+        super().__init__(paths)
+        with rio.open(self.files[0]) as src:
+            self.to_index = src.index
+    
+    def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
+        """Retrieve image/mask and metadata indexed by query.
+
+        Args:
+            query: (minx, maxx, miny, maxy, mint, maxt) coordinates to index
+
+        Returns:
+            sample of image/mask and metadata at that index
+
+        Raises:
+            IndexError: if query is not found in the index
+        """
+        hits = self.index.intersection(tuple(query), objects=True)
+        filepaths = cast(list[str], [hit.object for hit in hits])
+
+        if not filepaths:
+            raise IndexError(
+                f"query: {query} not found in index with bounds: {self.bounds}"
+            )
+
+        data = self._merge_files(filepaths, query, self.band_indexes)
+
+        sample = {"crs": self.crs, "bbox": query, "top_lft_index": self.to_index(query[0], query[3])}
+
+        data = data.to(self.dtype)
+
+        if self.is_image:
+            sample["image"] = data
+        else:
+            sample["mask"] = data
+
+        return sample
 
     #tr = Transformer.from_crs("EPSG:32628", "EPSG:4326")
     def plot(self, sample):
