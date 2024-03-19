@@ -15,7 +15,7 @@ class SegmentConfig:
     def __init__(self,
                  batch_size,
                  size = 600,
-                 stride = 300,
+                 stride = 400,
                  device = 'cuda',
                  GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
@@ -25,14 +25,17 @@ class SegmentConfig:
                  TEXT_THRESHOLD = 0.30,
                  max_area_GD_boxes_mt2 = 6000,
                  ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
-                 ESAM_num_parall_queries = 5):
+                 ESAM_num_parall_queries = 5,
+                 road_width_mt = 5,
+                 smooth_patch_overlap = False):
         
         #General
         self.batch_size = batch_size
         self.size = size
         self.stride = stride # Overlap between each patch = (size - stride)
         self.device = device
-
+        self.smooth_patch_overlap = smooth_patch_overlap
+        
         #Grounding Dino (Trees)
         self.GD_root = Path(GD_root)
         self.CONFIG_PATH = self.GD_root / GD_config_file
@@ -47,6 +50,9 @@ class SegmentConfig:
         #Efficient SAM
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
         self.ESAM_num_parall_queries = ESAM_num_parall_queries
+        
+        #Roads
+        self.road_width_mt = road_width_mt
         
         print('\n- GD model device:', next(self.GD_model.parameters()).device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
