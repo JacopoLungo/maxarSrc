@@ -44,7 +44,7 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
                 del predicted_logits, predicted_iou
                 torch.cuda.empty_cache()
     else: #if there are no queries (in any image in the batch)
-        np_complete_masks = np.ones((batch_size, 0, input_h, input_w)) * -1 #equal to set False on all the mask
+        np_complete_masks = np.ones((batch_size, 0, input_h, input_w)) * float('-inf') #equal to set False on all the mask
         
     
     return np_complete_masks #shape (b, masks, h, w)

@@ -114,7 +114,7 @@ class MxrSingleTileNoEmpty(RasterDataset):
     Returns a dict with:
         - crs
         - bbox of the sampled patch
-        - offset
+        - offset (index of the top left corner of the patch in the original image)
         - image patch
     """
     super

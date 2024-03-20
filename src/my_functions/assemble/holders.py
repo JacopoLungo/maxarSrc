@@ -20,6 +20,9 @@ from my_functions.assemble import names
 from my_functions.detect import detect
 from my_functions import output
 
+from my_functions import plotting_utils
+import matplotlib.pyplot as plt
+
 # Ignore all warnings
 warnings.filterwarnings('ignore')
 
@@ -88,13 +91,13 @@ class Mosaic:
         return road_mask  #shape: (h, w)
             
     
-    def new_seg_tree_and_build_tile(self, tile_path):
+    def new_seg_tree_and_build_tile(self, tile_path, debug = True):
         """
         This method should segment trees and buildings of a tile
         It should have access to a gdf of trees and a gdf of buildings stored as polygon??
         It should write the segmented mask in a canvas and return it.
 
-        smooth = True if you want ot use the logits
+        debug = True, if you want to process and plot some #batch_size random samples and plot them
         """
         
         if self.build_gdf is None:
@@ -107,8 +110,13 @@ class Mosaic:
         seg_config = self.event.seg_config
 
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
-        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
-        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
+        if debug:
+            sampler = samplers.MyRandomGeoSampler(dataset, length = seg_config.batch_size, size=seg_config.size)
+            dataloader = DataLoader(dataset , sampler=sampler, collate_fn=stack_samples)
+
+        else:
+            sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
+            dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
         canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
 
@@ -178,15 +186,37 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            
-            canvas = segment_utils.write_canvas_geo(canvas = canvas,
-                                                    patch_masks_b =  patch_masks_b,
-                                                    top_lft_indexes = batch['top_lft_index'],
-                                                    smooth=seg_config.smooth_patch_overlap)
+            if debug:
+                patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
+                for img, masks, tree_boxes, building_boxes in zip(img_b, patch_masks_b, tree_boxes_b, building_boxes_b):
+                    fig, axs = plt.subplots(1, 2, figsize = (15, 15))
+                    #plot trees and build separately
+                    plotting_utils.show_img(img, ax=axs[0])
+                    plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
+                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.3)
+                    
+                    plotting_utils.show_img(img, ax = axs[1])
+                    plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
+                    plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.3)
+                    
+                    #return img, masks, tree_boxes, building_boxes
+                    """plotting_utils.show_img(img)
+                    for mask, rgb_color in zip(masks[:2], [(255, 18, 18), (131, 220, 242)]):
+                        plotting_utils.show_mask(mask, plt.gca(), rgb_color = rgb_color, alpha = 0.6)
+                    plotting_utils.show_box(tree_boxes, plt.gca(), color='r', lw = 0.3)
+                    plotting_utils.show_box(building_boxes, plt.gca(), color='b', lw = 0.3)"""
+                    
+                    #plotting_utils.plot_comparison(batch['image'][0].permute(1,2,0).numpy().astype('uint8'), masks)
+                
+            else:
+                canvas = segment_utils.write_canvas_geo(canvas = canvas,
+                                                        patch_masks_b =  patch_masks_b,
+                                                        top_lft_indexes = batch['top_lft_index'],
+                                                        smooth=seg_config.smooth_patch_overlap)
 
             post_proc_total += time() - post_proc_start
-            
-            if batch_ix%100 == 0:
+                
+            if batch_ix%100 == 0 and batch_ix != 0:
                 print('Avg times (sec/batch)')
                 print(f'- GD: {(GD_total/(batch_ix + 1)):.4f}')
                 print(f'- build_box: {(build_box_total/(batch_ix + 1)):.4f}')
@@ -196,12 +226,13 @@ class Mosaic:
                 #TODO: aggiundere qui un metodo per debug che ti fa vedere una patch con segmentazione e boxes
             #if batch_ix == 50:
             #    break
-        canvas = np.greater_equal(canvas, 0)
-        print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
-        return canvas
+            
+        if not debug:
+            canvas = np.greater_equal(canvas, 0) #turn logits into bool
+            print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
+            return canvas
     
     def seg_tree_and_build_tile(self, tile_path):
-        
         if self.build_gdf is None:
             self.set_build_gdf()
         
@@ -298,9 +329,10 @@ class Mosaic:
             
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
+
     
     def segment_tile(self, tile_path, out_dir_root, overwrite = False):
-        
+                        
         if self.build_gdf is None:
             self.set_build_gdf()
         if self.road_gdf is None:
