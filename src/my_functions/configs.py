@@ -27,6 +27,7 @@ class SegmentConfig:
                  ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
                  ESAM_num_parall_queries = 5,
                  road_width_mt = 5,
+                 ext_mt_build_box = 10,
                  smooth_patch_overlap = False):
         
         #General
@@ -53,6 +54,9 @@ class SegmentConfig:
         
         #Roads
         self.road_width_mt = road_width_mt
+        
+        #Buildings
+        self.ext_mt_build_box = ext_mt_build_box
         
         print('\n- GD model device:', next(self.GD_model.parameters()).device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)

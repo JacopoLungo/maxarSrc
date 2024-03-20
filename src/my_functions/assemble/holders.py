@@ -118,9 +118,9 @@ class Mosaic:
             #BUILDINGS
             #get the building boxes in batches and the number of buildings for each image
             building_boxes_b, num_build4img = detect.get_batch_buildings_boxes(batch['bbox'],
-                                                                        proj_buildings_gdf = self.proj_build_gdf,
-                                                                        dataset_res = dataset.res,
-                                                                        ext_mt = 10)
+                                                                proj_buildings_gdf = self.proj_build_gdf,
+                                                                dataset_res = dataset.res,
+                                                                ext_mt = seg_config.ext_mt_build_box)
                         
             max_detect = max(num_trees4img + num_build4img)
             
@@ -155,7 +155,7 @@ class Mosaic:
                 plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
                 plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
     
-    def new_seg_tree_and_build_tile(self, tile_path, debug = True):
+    def new_seg_tree_and_build_tile(self, tile_path):
         """
         This method should segment trees and buildings of a tile
         It should have access to a gdf of trees and a gdf of buildings stored as polygon??
@@ -174,13 +174,8 @@ class Mosaic:
         seg_config = self.event.seg_config
 
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
-        if debug:
-            sampler = samplers.MyRandomGeoSampler(dataset, length = seg_config.batch_size, size=seg_config.size)
-            dataloader = DataLoader(dataset , sampler=sampler, collate_fn=stack_samples)
-
-        else:
-            sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
-            dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
+        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
+        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
         canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
 
@@ -250,24 +245,10 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            if debug:
-                patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
-                for img, masks, tree_boxes, building_boxes in zip(img_b, patch_masks_b, tree_boxes_b, building_boxes_b):
-                    fig, axs = plt.subplots(1, 2, figsize = (15, 15))
-                    #plot trees and build separately
-                    plotting_utils.show_img(img, ax=axs[0])
-                    plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
-                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
-                    
-                    plotting_utils.show_img(img, ax = axs[1])
-                    plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
-                    plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
-                
-            else:
-                canvas = segment_utils.write_canvas_geo(canvas = canvas,
-                                                        patch_masks_b =  patch_masks_b,
-                                                        top_lft_indexes = batch['top_lft_index'],
-                                                        smooth=seg_config.smooth_patch_overlap)
+            canvas = segment_utils.write_canvas_geo(canvas = canvas,
+                                                    patch_masks_b =  patch_masks_b,
+                                                    top_lft_indexes = batch['top_lft_index'],
+                                                    smooth=seg_config.smooth_patch_overlap)
 
             post_proc_total += time() - post_proc_start
                 
@@ -282,10 +263,9 @@ class Mosaic:
             #if batch_ix == 50:
             #    break
             
-        if not debug:
-            canvas = np.greater_equal(canvas, 0) #turn logits into bool
-            print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
-            return canvas
+        canvas = np.greater_equal(canvas, 0) #turn logits into bool
+        print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
+        return canvas
     
     def seg_tree_and_build_tile(self, tile_path):
         if self.build_gdf is None:
@@ -456,7 +436,9 @@ class Event:
         for m_name in self.all_mosaics_names:
             self.mosaics[m_name] = Mosaic(m_name, self)
 
-
+    def set_seg_config(self, seg_config):
+        self.seg_config = seg_config
+    
     #Roads methods
     def set_road_gdf(self): #set road_gdf for the event
         region_road_gdf = gen_gdf.get_region_road_gdf(self.region_name)
