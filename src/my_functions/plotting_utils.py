@@ -30,16 +30,16 @@ def show_Linestrings(lines: Union[List[LineString], LineString], ax, color = 're
         x_s, y_s = line.coords.xy
         ax.plot(x_s, y_s, color=color, linewidth=linewidth)
 
-def show_box(boxes, ax, color='r'):
+def show_box(boxes, ax, color='r', lw = 0.5):
     """
     Plot a single or list of boxes. Where the single box is in the format [x0, y0, x1, y1]
     """
-    if not isinstance(boxes, list):
+    if not isinstance(boxes, list) and not isinstance(boxes, np.ndarray):
         boxes = [boxes]
     for box in boxes:
         x0, y0 = box[0], box[1]
         w, h = box[2] - box[0], box[3] - box[1]
-        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor=color, facecolor=(0,0,0,0), lw=0.5))
+        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor=color, facecolor=(0,0,0,0), lw=lw))
 
 def show_points(coords: np.array, labels: np.array, ax, marker_size=75):
     """
