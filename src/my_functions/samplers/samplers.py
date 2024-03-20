@@ -13,7 +13,7 @@ import math
 
 class MyRandomGeoSampler(RandomGeoSampler):
     """
-    Sample a single random bounding box from a dataset.
+    Sample a single random bounding box from a dataset (does NOT support batches).
     Check that the random bounding box is inside the tile's polygon.
     """
     def __init__(
@@ -63,7 +63,7 @@ class MyRandomGeoSampler(RandomGeoSampler):
 
 class MyGridGeoSampler(GridGeoSampler):
     """
-    Sample a single bounding box in a grid fashion from a dataset.
+    Sample a single bounding box in a grid fashion from a dataset (does NOT support batches).
     Check that the bounding box is inside the tile's polygon.
     """
     def __init__(self,
@@ -112,11 +112,11 @@ class MyGridGeoSampler(GridGeoSampler):
                     else:
                         continue
 
-class MyBatchGridGeoSampler(GridGeoSampler):
-    """
-    Sample a batch of bounding boxes from a dataset.
-    Check if the bounding box is inside the tile's polygon.
-    """
+"""class MyBatchGridGeoSampler(GridGeoSampler):
+    
+    #Sample a batch of bounding boxes from a dataset.
+    #Check if the bounding box is inside the tile's polygon.
+    
     def __init__(self,
         dataset: GeoDataset,
         size: Union[tuple[float, float], float],
@@ -130,11 +130,11 @@ class MyBatchGridGeoSampler(GridGeoSampler):
         self.batch_size = batch_size
     
     def __iter__(self) -> Iterator[BoundingBox]:
-        """Return the index of a dataset.
+        #Return the index of a dataset.
 
-        Returns:
-            (minx, maxx, miny, maxy, mint, maxt) coordinates to index a dataset
-        """
+        #Returns:
+        #    (minx, maxx, miny, maxy, mint, maxt) coordinates to index a dataset
+        
         batch = []
         # For each tile...
         for k, hit in enumerate(self.hits): #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
@@ -184,17 +184,17 @@ class MyBatchGridGeoSampler(GridGeoSampler):
         print('True batch size: ', math.ceil(len(self) - discarder_chips/self.batch_size))
 
     def __len__(self) -> int:
-        """Return the number of batches in a single epoch.
+        #Return the number of batches in a single epoch.
 
-        Returns:
-            number of batches in an epoch
-        """
-        return math.ceil(self.length / self.batch_size)
+        #Returns:
+        #   number of batches in an epoch
+        
+        return math.ceil(self.length / self.batch_size)"""
     
 class WholeTifGridGeoSampler(GridGeoSampler):
     """
     Sample a batch of bounding boxes from a dataset.
-    Check if the bounding box is inside the tile's polygon.
+    Returns all possible patches even if they are empty.
     """
     def __init__(self,
         dataset: GeoDataset,
@@ -277,9 +277,9 @@ class WholeTifGridGeoSampler(GridGeoSampler):
 
 class BatchGridGeoSampler(GridGeoSampler):
     """
-    Sample a batch of bounding boxes from a dataset.
+    Sample a batch of bounding boxes from a dataset in a grid fashion.
     Check if the bounding box is inside the tile's polygon.
-    Return along with the bounding box, the offset.
+    Discard empty patches.
     """
     def __init__(self,
         dataset: GeoDataset,
