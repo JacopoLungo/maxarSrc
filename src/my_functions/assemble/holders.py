@@ -90,6 +90,70 @@ class Mosaic:
             road_mask = np.zeros((tile_h, tile_w))
         return road_mask  #shape: (h, w)
             
+    def seg_tree_and_build_rnd_samples(self, tile_path):
+        if self.build_gdf is None:
+            self.set_build_gdf()
+        
+        seg_config = self.event.seg_config
+        
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
+        sampler = samplers.MyRandomGeoSampler(dataset, length = seg_config.batch_size, size=seg_config.size)
+        dataloader = DataLoader(dataset , sampler=sampler, collate_fn=stack_samples)
+        
+        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
+            original_img_tsr = batch['image']
+            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8') #TODO: l'immagine viene convertita in numpy ma magari è meglio lasciarla in tensor
+
+            #TREES
+            #get the tree boxes in batches and the number of trees for each image
+            tree_boxes_b, num_trees4img = detect.get_GD_boxes(img_b,
+                                                seg_config.GD_model,
+                                                seg_config.TEXT_PROMPT,
+                                                seg_config.BOX_THRESHOLD,
+                                                seg_config.TEXT_THRESHOLD,
+                                                dataset.res,
+                                                device = seg_config.device,
+                                                max_area_mt2 = seg_config.max_area_GD_boxes_mt2)
+            
+            #BUILDINGS
+            #get the building boxes in batches and the number of buildings for each image
+            building_boxes_b, num_build4img = detect.get_batch_buildings_boxes(batch['bbox'],
+                                                                        proj_buildings_gdf = self.proj_build_gdf,
+                                                                        dataset_res = dataset.res,
+                                                                        ext_mt = 10)
+                        
+            max_detect = max(num_trees4img + num_build4img)
+            
+            #print("\n__________________________")
+            #print("Batch number: ", i)
+            #print(f'Num detections in batch per img: {num_trees4img + num_build4img}')
+            
+            #obtain the right input for the ESAM model (trees + buildings)
+            input_points, input_labels = segment_utils.get_input_pts_and_lbs(tree_boxes_b, building_boxes_b, max_detect)
+            
+            all_masks_b = segment.ESAM_from_inputs(original_img_tsr,
+                                                    torch.from_numpy(input_points),
+                                                    torch.from_numpy(input_labels),
+                                                    efficient_sam = seg_config.efficient_sam,
+                                                    device = seg_config.device,
+                                                    num_parall_queries = seg_config.ESAM_num_parall_queries)
+            
+            #for each image, discern the masks in trees, buildings and padding
+            patch_masks_b = segment_utils.discern_mode_smooth(all_masks_b, num_trees4img, num_build4img, mode = 'bchw') #(b, channel, h_patch, w_patch)
+            
+            patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
+            
+            #plotting
+            for img, masks, tree_boxes, building_boxes in zip(img_b, patch_masks_b, tree_boxes_b, building_boxes_b):
+                fig, axs = plt.subplots(1, 2, figsize = (15, 15))
+                #plot trees and build separately
+                plotting_utils.show_img(img, ax=axs[0])
+                plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
+                plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
+                
+                plotting_utils.show_img(img, ax = axs[1])
+                plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
+                plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
     
     def new_seg_tree_and_build_tile(self, tile_path, debug = True):
         """
@@ -103,7 +167,7 @@ class Mosaic:
         if self.build_gdf is None:
             self.set_build_gdf()
         
-        #Here compute all the tree boxes and store them in a gdf
+        #Here call function to compute all the tree boxes and store them in a gdf
         
         
         
@@ -193,20 +257,11 @@ class Mosaic:
                     #plot trees and build separately
                     plotting_utils.show_img(img, ax=axs[0])
                     plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
-                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.3)
+                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
                     
                     plotting_utils.show_img(img, ax = axs[1])
                     plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
-                    plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.3)
-                    
-                    #return img, masks, tree_boxes, building_boxes
-                    """plotting_utils.show_img(img)
-                    for mask, rgb_color in zip(masks[:2], [(255, 18, 18), (131, 220, 242)]):
-                        plotting_utils.show_mask(mask, plt.gca(), rgb_color = rgb_color, alpha = 0.6)
-                    plotting_utils.show_box(tree_boxes, plt.gca(), color='r', lw = 0.3)
-                    plotting_utils.show_box(building_boxes, plt.gca(), color='b', lw = 0.3)"""
-                    
-                    #plotting_utils.plot_comparison(batch['image'][0].permute(1,2,0).numpy().astype('uint8'), masks)
+                    plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
                 
             else:
                 canvas = segment_utils.write_canvas_geo(canvas = canvas,
