@@ -64,3 +64,20 @@ def filter_on_box_area_mt2(boxes, img_shape: Union[tuple[float, float], float], 
     keep_ix = (area_mt2 > min_area_mt2) & (area_mt2 < max_area_mt2)
     
     return keep_ix
+
+def filter_on_box_ratio(boxes, min_edges_ratio = 0):
+    keep_ix = (boxes[:,2] / boxes[:,3] > min_edges_ratio) & (boxes[:,3] / boxes[:,2] > min_edges_ratio)
+    return keep_ix
+
+def reduce_tree_boxes(boxes, reduce_perc):
+    """
+    Reduce the size of the boxes by 10%. Keeping the center fixed.
+    Input:
+        boxes: torch.Tensor of shape (N, 4). Where boxes are in the format cxcywh (the output of GroundingDINO).
+        reduce_perc: float, the percentage to reduce the boxes.
+    Output:
+        boxes: torch.Tensor of shape (N, 4). Where reduced boxes are in the format cxcywh.
+    """
+    reduced_boxes = boxes.clone()
+    reduced_boxes[:,2:] = reduced_boxes[:,2:] * (1 - reduce_perc)
+    return reduced_boxes

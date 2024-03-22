@@ -13,7 +13,9 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
                     TEXT_THRESHOLD,
                     dataset_res,
                     device,
-                    max_area_mt2 = 3000):
+                    max_area_mt2 = 3000,
+                    min_edges_ratio = 0,
+                    reduce_perc = 0):
     
     batch_tree_boxes4Sam = []
     sample_size = img_batch.shape[1]
@@ -22,12 +24,21 @@ def get_GD_boxes(img_batch: np.array, #b,h,w,c
     for img in img_batch:
         image_transformed = detect_utils.GD_img_load(img)
         tree_boxes, logits, phrases = GD_predict(GDINO_model, image_transformed, TEXT_PROMPT, BOX_THRESHOLD, TEXT_THRESHOLD, device = device)
-        tree_boxes4Sam = []
+        #tree_boxes4Sam = []
         if len(tree_boxes) > 0:
-            keep_ix_tree_boxes = detect_utils.filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
-            tree_boxes4Sam = detect_utils.GDboxes2SamBoxes(tree_boxes[keep_ix_tree_boxes], sample_size)
+            keep_ix_tree_boxes_area = detect_utils.filter_on_box_area_mt2(tree_boxes, sample_size, dataset_res, max_area_mt2 = max_area_mt2)
+            keep_ix_tree_boxes_ratio = detect_utils.filter_on_box_ratio(tree_boxes, min_edges_ratio = min_edges_ratio)
+            keep_ix_tree_boxes  = keep_ix_tree_boxes_area & keep_ix_tree_boxes_ratio
+            
+            reduced_tree_boxes = detect_utils.reduce_tree_boxes(tree_boxes[keep_ix_tree_boxes], reduce_perc = reduce_perc)
+            
+            tree_boxes4Sam = detect_utils.GDboxes2SamBoxes(reduced_tree_boxes, sample_size)
+            
             num_trees4img.append(tree_boxes4Sam.shape[0])
             batch_tree_boxes4Sam.append(tree_boxes4Sam)
+        else:
+            num_trees4img.append(0)
+            batch_tree_boxes4Sam.append(np.empty((0,4)))
     return batch_tree_boxes4Sam, np.array(num_trees4img)
 
 def get_batch_buildings_boxes(batch_bbox: List, proj_buildings_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 10):
