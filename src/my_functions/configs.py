@@ -16,18 +16,25 @@ class SegmentConfig:
                  batch_size,
                  size = 600,
                  stride = 400,
+                 
                  device = 'cuda',
                  GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
                  GD_weights = "groundingdino_swint_ogc.pth",
+                 
                  TEXT_PROMPT = 'green tree',
                  BOX_THRESHOLD = 0.15,
                  TEXT_THRESHOLD = 0.30,
+                 
                  max_area_GD_boxes_mt2 = 6000,
-                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
-                 ESAM_num_parall_queries = 5,
+                 min_ratio_GD_boxes_edges = 0,
+                 perc_reduce_tree_boxes = 0,
+                 
                  road_width_mt = 5,
                  ext_mt_build_box = 10,
+                 
+                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
+                 ESAM_num_parall_queries = 5,
                  smooth_patch_overlap = False):
         
         #General
@@ -47,6 +54,8 @@ class SegmentConfig:
         self.BOX_THRESHOLD = BOX_THRESHOLD
         self.TEXT_THRESHOLD = TEXT_THRESHOLD
         self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
+        self.min_ratio_GD_boxes_edges = min_ratio_GD_boxes_edges
+        self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
 
         #Efficient SAM
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
@@ -60,3 +69,6 @@ class SegmentConfig:
         
         print('\n- GD model device:', next(self.GD_model.parameters()).device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
+    
+    def __str__(self) -> str:
+        return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }\n{self.road_width_mt = }\n{self.ext_mt_build_box = }'
