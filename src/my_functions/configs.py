@@ -11,6 +11,7 @@ from efficient_sam.build_efficient_sam import build_efficient_sam_vitt
 class SegmentConfig:
     """
     Config class for the segmentation pipeline.
+    It contains detection and segmentation as well as the models themselves. 
     """
     def __init__(self,
                  batch_size,
@@ -72,3 +73,49 @@ class SegmentConfig:
     
     def __str__(self) -> str:
         return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }\n{self.road_width_mt = }\n{self.ext_mt_build_box = }'
+    
+
+class DetectConfig:
+    def __init__(self,
+                 batch_size,
+                 size = 600,
+                 stride = 400,
+                 
+                 device = 'cuda',
+                 GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
+                 GD_config_file = "GroundingDINO_SwinT_OGC.py",
+                 GD_weights = "groundingdino_swint_ogc.pth",
+                 
+                 TEXT_PROMPT = 'green tree',
+                 BOX_THRESHOLD = 0.15,
+                 TEXT_THRESHOLD = 0.30,
+                 
+                 max_area_GD_boxes_mt2 = 6000,
+                 min_ratio_GD_boxes_edges = 0,
+                 perc_reduce_tree_boxes = 0):
+        
+        #General
+        self.batch_size = batch_size
+        self.size = size
+        self.stride = stride # Overlap between each patch = (size - stride)
+        self.device = device
+        
+        #Grounding Dino (Trees)
+        self.GD_root = Path(GD_root)
+        self.CONFIG_PATH = self.GD_root / GD_config_file
+        self.WEIGHTS_PATH = self.GD_root / GD_weights
+
+        #self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH).to(self.device)
+        self.TEXT_PROMPT = TEXT_PROMPT
+        self.BOX_THRESHOLD = BOX_THRESHOLD
+        self.TEXT_THRESHOLD = TEXT_THRESHOLD
+        self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
+        self.min_ratio_GD_boxes_edges = min_ratio_GD_boxes_edges
+        self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
+        
+        
+    def __str__(self) -> str:
+        return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }'
+    
+    
+    

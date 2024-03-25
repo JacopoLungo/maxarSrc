@@ -39,12 +39,24 @@ def boundingBox_2_Polygon(bounding_box):
     bbox_polyg = shapely.geometry.Polygon(vertices)
     return bbox_polyg
 
+def xyxyBox2Polygon(xyxy_box):
+    """
+    Create a shapely Polygon from a xyxy box
+    """
+    minx, miny, maxx, maxy = xyxy_box
+    vertices = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny)]
+    bbox_polyg = shapely.geometry.Polygon(vertices)
+    return bbox_polyg
+    
+
 def boundingBox_2_centralPoint(bounding_box):
     """
     Create a shapely Point from a BoundingBox
     """
     minx, miny, maxx, maxy = bounding_box.minx, bounding_box.miny, bounding_box.maxx, bounding_box.maxy
     return shapely.geometry.Point((minx + maxx)/2, (miny + maxy)/2)
+
+#def coords2
     
 def rel_bbox_coords(geodf:gpd.GeoDataFrame,
                     ref_coords:tuple,
@@ -66,8 +78,8 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
     ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the square sample extracted from the tile
     #print('\nref_coords top left: ', ref_minx, ref_maxy )
     for geom in geodf['geometry']:
-        building_minx, building_miny, building_maxx, building_maxy = geom.bounds
-        if ext_mt != None:
+        building_minx, building_miny, building_maxx, building_maxy = geom.bounds #This turn the polygon into a bbox axis aligned
+        if ext_mt != None or ext_mt != 0:
             building_minx -= (ext_mt / 2)
             building_miny -= (ext_mt / 2)
             building_maxx += (ext_mt / 2)

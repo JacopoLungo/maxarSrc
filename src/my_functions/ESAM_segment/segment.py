@@ -39,7 +39,7 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
                 np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
             else:
                 np_complete_masks = np.concatenate((np_complete_masks, predicted_logits[:,:,0].cpu().detach().numpy()), axis=1)
-            #TODO: check if empty_cuda_cache Fasle is faster
+            #TODO: check if empty_cuda_cache False is faster
             if empty_cuda_cache:
                 del predicted_logits, predicted_iou
                 torch.cuda.empty_cache()

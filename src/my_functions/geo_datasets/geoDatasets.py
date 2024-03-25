@@ -117,13 +117,14 @@ class MxrSingleTileNoEmpty(RasterDataset):
         - offset (index of the top left corner of the patch in the original image)
         - image patch
     """
-    super
+    
     filename_glob = "*.tif"
     is_image = True
     def __init__(self, paths):
         super().__init__(paths)
         with rio.open(self.files[0]) as src:
             self.to_index = src.index
+            self.to_xy = src.xy
     
     def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
         """Retrieve image/mask and metadata indexed by query.
@@ -137,6 +138,7 @@ class MxrSingleTileNoEmpty(RasterDataset):
         Raises:
             IndexError: if query is not found in the index
         """
+        
         hits = self.index.intersection(tuple(query), objects=True)
         filepaths = cast(list[str], [hit.object for hit in hits])
 
