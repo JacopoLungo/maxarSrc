@@ -3,7 +3,11 @@ from groundingdino.util.inference import predict as GD_predict
 import numpy as np
 from typing import List
 import geopandas as gpd
-from my_functions.samplers import samplers_utils
+from my_functions.samplers import samplers, samplers_utils
+from my_functions.geo_datasets import geoDatasets
+from torch.utils.data import DataLoader
+from torchgeo.datasets.utils import BoundingBox
+
 
 
 def get_GD_boxes(img_batch: np.array, #b,h,w,c
@@ -59,3 +63,30 @@ def get_batch_buildings_boxes(batch_bbox: List, proj_buildings_gdf: gpd.GeoDataF
         batch_building_boxes.append(building_boxes)
 
     return batch_building_boxes, np.array(num_build4img)
+def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 10):
+    """
+    Given a batch of bounding boxes in a proj crs, it returns the boxes in the right coordinates relative to the sampled patch. 
+    It is necessary that the bbox and the gdf are in the same crs.
+    """
+    batch_boxes = []
+    num_boxes4img = []
+    for bbox in batch_bbox:
+        query_patch_poly = samplers_utils.boundingBox_2_Polygon(bbox) #from patch bbox to polygon
+        gdf_index = proj_gdf.sindex #get spatial index
+        hits = gdf_index.query(query_patch_poly) #query index
+        
+        num_boxes4img.append(len(hits)) #append number of boxes
+        
+        if len(hits) > 0: #if there is at least a box in the query_bbox_poly
+                      
+            boxes = samplers_utils.rel_bbox_coords(geodf = proj_gdf.iloc[hits],
+                                                    ref_coords = query_patch_poly.bounds,
+                                                    res = dataset_res,
+                                                    ext_mt = ext_mt)
+            boxes = np.array(boxes)
+        else: #append empty array if no buildings
+            boxes = np.empty((0,4))
+        
+        batch_boxes.append(boxes)
+    
+    return batch_boxes, np.array(num_boxes4img)

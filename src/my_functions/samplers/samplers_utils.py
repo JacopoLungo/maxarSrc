@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 import geopandas as gpd
 from my_functions.geo_datasets import geoDatasets
+from shapely.geometry.polygon import Polygon
+
 #from my_functions import segment
 
 def path_2_tilePolygon(tile_path, root = '/mnt/data2/vaschetti_data/maxar/metadata/from_github/datasets' ):
@@ -56,8 +58,13 @@ def boundingBox_2_centralPoint(bounding_box):
     minx, miny, maxx, maxy = bounding_box.minx, bounding_box.miny, bounding_box.maxx, bounding_box.maxy
     return shapely.geometry.Point((minx + maxx)/2, (miny + maxy)/2)
 
-#def coords2
-    
+def align_bbox(bbox: Polygon):
+    """
+    Turn the polygon into a bbox axis aligned
+    """
+    minx, miny, maxx, maxy = bbox.bounds
+    return minx, miny, maxx, maxy
+
 def rel_bbox_coords(geodf:gpd.GeoDataFrame,
                     ref_coords:tuple,
                     res,
@@ -75,17 +82,17 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
         a list of tuples with the relative coordinates of the bboxes [(minx, miny, maxx, maxy), ...]
     """
     result = []
-    ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the square sample extracted from the tile
+    ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the patch sample extracted from the tile
     #print('\nref_coords top left: ', ref_minx, ref_maxy )
     for geom in geodf['geometry']:
-        building_minx, building_miny, building_maxx, building_maxy = geom.bounds #This turn the polygon into a bbox axis aligned
+        minx, miny, maxx, maxy = align_bbox(geom)
         if ext_mt != None or ext_mt != 0:
-            building_minx -= (ext_mt / 2)
-            building_miny -= (ext_mt / 2)
-            building_maxx += (ext_mt / 2)
-            building_maxy += (ext_mt / 2)
+            minx -= (ext_mt / 2)
+            miny -= (ext_mt / 2)
+            maxx += (ext_mt / 2)
+            maxy += (ext_mt / 2)
 
-        rel_bbox_coords = list(np.array([building_minx - ref_minx, ref_maxy - building_maxy, building_maxx - ref_minx, ref_maxy - building_miny]) / res)
+        rel_bbox_coords = list(np.array([minx - ref_minx, ref_maxy - maxy, maxx - ref_minx, ref_maxy - miny]) / res)
         result.append(rel_bbox_coords)
     
     return result

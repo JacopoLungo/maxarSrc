@@ -111,7 +111,7 @@ class Mosaic:
         
         glb_tile_tree_boxes = torch.empty(0, 4)
                
-        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
+        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc="Detecting Trees"):
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
             
             for img, img_top_left_index in zip(img_b, batch['top_lft_index']):
@@ -245,7 +245,7 @@ class Mosaic:
                     plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
                     plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
     
-    def seg_glb_tree_and_build_tile(self, tile_path):
+    def seg_glb_tree_and_build_tile(self, tile_path, debug_param_trees_gdf = None):
         """
         This method segment trees and buildings of a tile.
         It does compute tree boxes at tile level, NOT at patch level. 
@@ -253,7 +253,10 @@ class Mosaic:
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
         
-        trees_gdf = self.detect_trees_tile(tile_path, georef = True)
+        if debug_param_trees_gdf is None: 
+            trees_gdf = self.detect_trees_tile(tile_path, georef = True)
+        else:
+            trees_gdf = debug_param_trees_gdf
         
         seg_config = self.event.seg_config
 
@@ -264,26 +267,30 @@ class Mosaic:
                                                stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
+        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        
+        Esam_total = 0
+        post_proc_total = 0
+        start_time_all = time()
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
             original_img_tsr = batch['image']
-            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8') #TODO: l'immagine viene convertita in numpy ma magari è meglio lasciarla in tensor
 
-            #trees
-            #GD_t_0 = time()
-            
+            #TREES 
             #get the tree boxes in batches and the number of trees for each image
-  
             #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
-            
-            #print('GD_time: ', time() - GD_t_0)
-
+            tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
+                                                                proj_gdf = trees_gdf,
+                                                                dataset_res = dataset.res,
+                                                                ext_mt = 0)
+  
+            #BUILDINGS
             #get the building boxes in batches and the number of buildings for each image
-            building_boxes_b, num_build4img = detect.get_batch_buildings_boxes(batch['bbox'],
-                                                                        proj_buildings_gdf = self.proj_build_gdf,
-                                                                        dataset_res = dataset.res,
-                                                                        ext_mt = seg_config.ext_mt_build_box)
-            
             #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
+            building_boxes_b, num_build4img = detect.get_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = self.proj_build_gdf,
+                                                                    dataset_res = dataset.res,
+                                                                    ext_mt = seg_config.ext_mt_build_box)
+            
             
             max_detect = max(num_trees4img + num_build4img)
             
@@ -329,8 +336,7 @@ class Mosaic:
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
-         
-    
+
     def new_seg_tree_and_build_tile(self, tile_path):
         """
         This method should segment trees and buildings of a tile
@@ -588,8 +594,7 @@ class Event:
                  when = 'pre', #'pre', 'post', None or 'None'
                  maxar_root = '/mnt/data2/vaschetti_data/maxar',
                  maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
-                 region = 'infer'
-                 ):
+                 region = 'infer'):
         #Configs
         self.seg_config = seg_config
         self.det_config = det_config

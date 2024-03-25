@@ -32,11 +32,12 @@ class SegmentConfig:
                  perc_reduce_tree_boxes = 0,
                  
                  road_width_mt = 5,
-                 ext_mt_build_box = 10,
+                 ext_mt_build_box = 0,
                  
                  ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
                  ESAM_num_parall_queries = 5,
-                 smooth_patch_overlap = False):
+                 smooth_patch_overlap = False,
+                 use_separate_detect_config = False):
         
         #General
         self.batch_size = batch_size
@@ -45,18 +46,19 @@ class SegmentConfig:
         self.device = device
         self.smooth_patch_overlap = smooth_patch_overlap
         
-        #Grounding Dino (Trees)
-        self.GD_root = Path(GD_root)
-        self.CONFIG_PATH = self.GD_root / GD_config_file
-        self.WEIGHTS_PATH = self.GD_root / GD_weights
+        if not use_separate_detect_config: #if you are not using a separate detect_config then define here all the detection configuration
+            #Grounding Dino (Trees)
+            self.GD_root = Path(GD_root)
+            self.CONFIG_PATH = self.GD_root / GD_config_file
+            self.WEIGHTS_PATH = self.GD_root / GD_weights
 
-        self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH).to(self.device)
-        self.TEXT_PROMPT = TEXT_PROMPT
-        self.BOX_THRESHOLD = BOX_THRESHOLD
-        self.TEXT_THRESHOLD = TEXT_THRESHOLD
-        self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
-        self.min_ratio_GD_boxes_edges = min_ratio_GD_boxes_edges
-        self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
+            self.GD_model = GD_load_model(self.CONFIG_PATH, self.WEIGHTS_PATH).to(self.device)
+            self.TEXT_PROMPT = TEXT_PROMPT
+            self.BOX_THRESHOLD = BOX_THRESHOLD
+            self.TEXT_THRESHOLD = TEXT_THRESHOLD
+            self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
+            self.min_ratio_GD_boxes_edges = min_ratio_GD_boxes_edges
+            self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
 
         #Efficient SAM
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
@@ -68,7 +70,8 @@ class SegmentConfig:
         #Buildings
         self.ext_mt_build_box = ext_mt_build_box
         
-        print('\n- GD model device:', next(self.GD_model.parameters()).device)
+        if not use_separate_detect_config:
+            print('\n- GD model device:', next(self.GD_model.parameters()).device)
         print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
     
     def __str__(self) -> str:
