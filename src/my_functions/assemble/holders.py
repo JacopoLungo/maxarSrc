@@ -219,12 +219,27 @@ class Mosaic:
             
             #for each image, discern the masks in trees, buildings and padding
             patch_masks_b = segment_utils.discern_mode_smooth(all_masks_b, num_trees4img, num_build4img, mode = 'bchw') #(b, channel, h_patch, w_patch)
-            
-            patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
+            if False:
+                patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
             
             #plotting
             for img, masks, tree_boxes, building_boxes in zip(img_b, patch_masks_b, tree_boxes_b, building_boxes_b):
-                if True:
+                if True: #plot logits
+                    fig, axs = plt.subplots(1,3,figsize = (20, 20))
+                    if title is not None:
+                            fig.suptitle(title)
+                    axs[0].imshow(masks[0], cmap='hot', interpolation='nearest')
+                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
+                    
+                    plotting_utils.show_img(img, ax=axs[1])
+                    plotting_utils.show_box(tree_boxes, axs[1], color='r', lw = 0.4)
+                    
+                    plotting_utils.show_img(img, ax=axs[2])
+                    plotting_utils.show_mask(np.greater_equal(masks[0], 0), axs[2], rgb_color = (255, 18, 18), alpha = 0.4)
+                    plotting_utils.show_box(tree_boxes, axs[2], color='r', lw = 0.4)
+                    
+                    
+                if False: #plot only trees
                     fig, ax = plt.subplots(figsize = (15, 15))
                     if title is not None:
                             fig.suptitle(title)
@@ -232,7 +247,8 @@ class Mosaic:
                     plotting_utils.show_img(img, ax=ax)
                     plotting_utils.show_mask(masks[0], ax, rgb_color = (255, 18, 18), alpha = 0.4)
                     plotting_utils.show_box(tree_boxes, ax, color='r', lw = 0.4)
-                if False:  
+                
+                if False: #plot trees and buildings  
                     fig, axs = plt.subplots(1, 2, figsize = (16, 8))
                     if title is not None:
                         fig.suptitle(title)
@@ -272,7 +288,7 @@ class Mosaic:
         Esam_total = 0
         post_proc_total = 0
         start_time_all = time()
-        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
+        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
             original_img_tsr = batch['image']
 
             #TREES 
@@ -547,8 +563,11 @@ class Mosaic:
             
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
-    
-    def segment_tile(self, tile_path, out_dir_root, overwrite = False):
+        
+    def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False):
+        """
+        glbl_det: if True tree detection are computed at tile level, if False at patch level
+        """
                         
         if self.build_gdf is None:
             self.set_build_gdf()
@@ -569,11 +588,14 @@ class Mosaic:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
         #tree_and_build_mask = self.seg_tree_and_build_tile(tile_path)
+        if glbl_det:
+            tree_and_build_mask = self.seg_glb_tree_and_build_tile(tile_path)
+        else:
+            tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
-        tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         road_mask = self.seg_road_tile(tile_path)
         
-        #TODO: aggiungere post processing mask (tappare buchi, cancellare paritcelle)
+        #TODO: aggiungere post processing mask (tappare buchi, cancellare particelle)
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask[:-1]) , axis = 0)
         
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)

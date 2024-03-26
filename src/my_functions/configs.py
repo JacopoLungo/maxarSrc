@@ -11,7 +11,7 @@ from efficient_sam.build_efficient_sam import build_efficient_sam_vitt
 class SegmentConfig:
     """
     Config class for the segmentation pipeline.
-    It contains detection and segmentation as well as the models themselves. 
+    It contains detection and segmentation parameters as well as the models themselves. 
     """
     def __init__(self,
                  batch_size,
@@ -23,7 +23,7 @@ class SegmentConfig:
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
                  GD_weights = "groundingdino_swint_ogc.pth",
                  
-                 TEXT_PROMPT = 'green tree',
+                 TEXT_PROMPT = 'bush', #'green tree'
                  BOX_THRESHOLD = 0.15,
                  TEXT_THRESHOLD = 0.30,
                  
@@ -79,8 +79,9 @@ class SegmentConfig:
     
 
 class DetectConfig:
+
     def __init__(self,
-                 batch_size,
+                 batch_size = 1,
                  size = 600,
                  stride = 400,
                  
@@ -89,7 +90,7 @@ class DetectConfig:
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
                  GD_weights = "groundingdino_swint_ogc.pth",
                  
-                 TEXT_PROMPT = 'green tree',
+                 TEXT_PROMPT = 'bush', #'green tree'
                  BOX_THRESHOLD = 0.15,
                  TEXT_THRESHOLD = 0.30,
                  
