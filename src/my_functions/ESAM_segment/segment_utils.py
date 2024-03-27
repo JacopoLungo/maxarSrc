@@ -197,7 +197,7 @@ def write_canvas_geo(canvas: np.array,
     """
     size = patch_masks_b.shape[-1]
     for patch_mask, top_left_index in zip(patch_masks_b, top_lft_indexes):
-        I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size]
+        I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
         #max_idxs is useful when reached the border of the canva, it contains the height and width that you can write on the canva
         max_idxs = canvas[I].shape[1:]
         
@@ -205,6 +205,8 @@ def write_canvas_geo(canvas: np.array,
         #print('patch', patch_mask[:, :max_idxs[0], :max_idxs[1]].shape)
         if smooth:
             canvas[I] = np.maximum(canvas[I], patch_mask[:, :max_idxs[0], :max_idxs[1]]) #element-wise max between the canva and the patch
+        #elif smooth == 'avg':
+        #    canvas[I] = (canvas[I] + patch_mask[:, :max_idxs[0], :max_idxs[1]]) / 2 #TODO: this is wrong
         else:
             canvas[I] = patch_mask[:, :max_idxs[0], :max_idxs[1]]
 

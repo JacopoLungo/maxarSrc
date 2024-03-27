@@ -29,6 +29,7 @@ from groundingdino.util.inference import load_model as GD_load_model
 from groundingdino.util.inference import predict as GD_predict
 
 import geopandas as gpd
+import supervision as sv
 
 # Ignore all warnings
 warnings.filterwarnings('ignore')
@@ -228,15 +229,17 @@ class Mosaic:
                     fig, axs = plt.subplots(1,3,figsize = (20, 20))
                     if title is not None:
                             fig.suptitle(title)
-                    axs[0].imshow(masks[0], cmap='hot', interpolation='nearest')
+                    axs[0].imshow(masks[1], cmap='hot', interpolation='nearest')
                     plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
                     
                     plotting_utils.show_img(img, ax=axs[1])
                     plotting_utils.show_box(tree_boxes, axs[1], color='r', lw = 0.4)
                     
                     plotting_utils.show_img(img, ax=axs[2])
-                    plotting_utils.show_mask(np.greater_equal(masks[0], 0), axs[2], rgb_color = (255, 18, 18), alpha = 0.4)
+                    plotting_utils.show_mask(np.greater_equal(masks[1], 0), axs[2], rgb_color = (255, 18, 18), alpha = 0.4)
                     plotting_utils.show_box(tree_boxes, axs[2], color='r', lw = 0.4)
+                    
+                    return masks[1] 
                     
                     
                 if False: #plot only trees
@@ -364,13 +367,8 @@ class Mosaic:
         
         if self.build_gdf is None:
             self.set_build_gdf()
-        
-        #Here call function to compute all the tree boxes and store them in a gdf
-        
-        
-        
-        seg_config = self.event.seg_config
 
+        seg_config = self.event.seg_config
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
         sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)

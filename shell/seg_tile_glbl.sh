@@ -19,4 +19,4 @@ python /home/vaschetti/maxarSrc/src/main_seg_tile_glbl_detections.py \
         --ext_mt_build_box 0 \
         --road_width_mt 5 \
         --ESAM_num_parall_queries 5 \
-        --out_dir_root "/home/vaschetti/maxarSrc/output/tiff/test_26_3_glbl"
+        --out_dir_root "/home/vaschetti/maxarSrc/output/tiff/to_delete"
