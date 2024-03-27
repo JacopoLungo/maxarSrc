@@ -1,0 +1,18 @@
+region_name,countries
+Europe-Full.tsv,"['NOR', 'FIN', 'SWE', 'UKR', 'FRA', 'ESP', 'DEU', 'POL', 'GBR', 'ITA', 'ISL', 'BLR', 'GRC', 'ROU', 'BGR', 'HUN', 'AUT', 'CZE', 'LVA', 'IRL', 'PRT', 'EST', 'LTU', 'SRB', 'DNK', 'HRV', 'BIH', 'SVK', 'NLD', 'BEL', 'CHE', 'MDA', 'MKD', 'ALB', 'SVN', 'MNE', 'LUX', 'MLT', 'AND', 'LIE', 'MCO']"
+SouthAmerica-Full.tsv,"['ARG', 'BRA', 'FLK', 'BOL', 'GUY', 'GUF', 'PRY', 'URY', 'SGS', 'SUR', 'CHL', 'COL', 'ECU', 'VEN', 'PER']"
+AsiaNorth-Full.tsv,"['MNG', 'RUS']"
+Canada-Full.tsv,['CAN']
+AfricaSouth-Full.tsv,"['AGO', 'MWI', 'BWA', 'LSO', 'MOZ', 'NAM', 'ZMB', 'ZAF', 'SWZ', 'ZWE']"
+AsiaSouthEast-Full.tsv,"['IDN', 'TWN', 'BRN', 'KHM', 'TLS', 'MYS', 'LAO', 'PHL', 'MMR', 'SGP', 'VNM', 'THA']"
+Japan-Full.tsv,['JAP']
+AfricaEast-Full.tsv,"['COM', 'DJI', 'ERI', 'ETH', 'MDG', 'KEN', 'RWA', 'MUS', 'SYC', 'SOM', 'SSD', 'TZA', 'UGA', 'SDN']"
+MiddleEast-Full.tsv,"['AFG', 'AZE', 'ARM', 'CYP', 'BHR', 'IRN', 'ISR', 'IRQ', 'JOR', 'LBN', 'KWT', 'PAK', 'PSE', 'OMN', 'SAU', 'QAT', 'TUR', 'SYR', 'YEM', 'ARE']"
+AfricaWest-Full.tsv,"['BEN', 'BFA', 'CPV', 'GMB', 'GHA', 'GIN', 'CIV', 'LBR', 'GNB', 'MLI', 'NER', 'NGA', 'SEN', 'SLE', 'TGO']"
+AsiaCenter-Full.tsv,"['KAZ', 'TJK', 'KGZ', 'TKM', 'UZB']"
+CaribbeanIslands-Full.tsv,"['AIA', 'BHS', 'BRB', 'ATG', 'BMU', 'VGB', 'BLZ', 'CUB', 'CYM', 'DMA', 'DOM', 'MTQ', 'GLP', 'GRD', 'JAM', 'HTI', 'PRI', 'KNA', 'MSR', 'LCA', 'VCT', 'TTO', 'TCA', 'VIR']"
+AsiaSouth-Full.tsv,"['IND', 'BGD', 'BTN', 'NPL', 'MDV', 'LKA']"
+Oceania-Full.tsv,"['AUS', 'TUV', 'NZL', 'PNG', 'FJI', 'SLB', 'VUT', 'FSM', 'MHL', 'KIR', 'NRU', 'WSM', 'PLW', 'TON']"
+AfricaCenter-Full.tsv,"['BDI', 'CMR', 'CAF', 'COG', 'TCD', 'COD', 'GNQ', 'GAB', 'STP']"
+AmericaCenter-Full.tsv,"['CRI', 'SLV', 'GTM', 'HND', 'NIC', 'MEX', 'PAN']"
+AfricaNorth-Full.tsv,"['EGY', 'DZA', 'MRT', 'MAR', 'LBY', 'TUN']"
