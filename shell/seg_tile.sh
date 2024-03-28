@@ -1,5 +1,5 @@
 #!/bin/bash
-python /home/vaschetti/maxarSrc/src/main_seg_tile.py \
+python src/main_seg_tile.py \
         --event_ix 6 \
         --when pre \
         --bs 2 \
