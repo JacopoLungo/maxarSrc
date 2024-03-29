@@ -18,3 +18,5 @@ from_github_maxar_metadata/
 *.code-workspace
 rnd.ipynb
 *.npy
+src/lightning_logs/
+*.gpkg

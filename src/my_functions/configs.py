@@ -76,8 +76,6 @@ class SegmentConfig:
     
     def __str__(self) -> str:
         return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }\n{self.road_width_mt = }\n{self.ext_mt_build_box = }'
-    
-
 class DetectConfig:
 
     def __init__(self,
@@ -94,9 +92,14 @@ class DetectConfig:
                  BOX_THRESHOLD = 0.15,
                  TEXT_THRESHOLD = 0.30,
                  
+                 DF_patch_size = 400,
+                 DF_patch_overlap = 0.25,
+                 DF_box_threshold = 0.1,
+                 
                  max_area_GD_boxes_mt2 = 6000,
                  min_ratio_GD_boxes_edges = 0,
-                 perc_reduce_tree_boxes = 0):
+                 perc_reduce_tree_boxes = 0,
+                 nms_threshold = 0.5):
         
         #General
         self.batch_size = batch_size
@@ -113,10 +116,18 @@ class DetectConfig:
         self.TEXT_PROMPT = TEXT_PROMPT
         self.BOX_THRESHOLD = BOX_THRESHOLD
         self.TEXT_THRESHOLD = TEXT_THRESHOLD
+        
+        #DeepForest
+        self.DF_patch_size = DF_patch_size
+        self.DF_patch_overlap = DF_patch_overlap
+        self.DF_box_threshold = DF_box_threshold
+        self.DF_device = [int(device.split(':')[-1])] if len(device.split(':')) > 1 else 'auto' #Remove the port number from the device (e.g. 'cuda:0' -> 'cuda'
+        
+        #Filtering
         self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2
         self.min_ratio_GD_boxes_edges = min_ratio_GD_boxes_edges
         self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
-        
+        self.nms_threshold = nms_threshold
         
     def __str__(self) -> str:
         return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }'
