@@ -1,6 +1,7 @@
 import torch
 from typing import Union, List
 from torchvision.ops import box_convert
+import torchvision
 import numpy as np
 import groundingdino.datasets.transforms as T
 from PIL import Image
@@ -41,7 +42,7 @@ def GD_img_load(np_img_rgb: np.array)-> torch.Tensor:
     image_transformed, _ = transform(image_pillow, None)
     return image_transformed
 
-def filter_on_box_area_mt2(boxes, img_shape: Union[tuple[float, float], float], img_res, min_area_mt2 = 0, max_area_mt2 = 1500, box_format = 'cxcywh'):
+def filter_on_box_area_mt2(boxes, img_shape: Union[tuple[float, float], float] = None, img_res = None, min_area_mt2 = 0, max_area_mt2 = 1500, box_format = 'cxcywh'):
     """
     Filter boxes based on min and max area.
     Inputs:

@@ -1,35 +1,37 @@
+#Generic
 from pathlib import Path
 from tqdm import tqdm
 from time import time
 import numpy as np
 import rasterio
+from rasterio.features import rasterize
 import warnings
 import torch
-import os
-
-from rasterio.features import rasterize
 from torch.utils.data import DataLoader
 from torchgeo.datasets import stack_samples
+import torchvision
+import geopandas as gpd
+import supervision as sv
+from typing import Tuple
+import matplotlib.pyplot as plt
+import os
 
-from my_functions.assemble import delimiters, filter, gen_gdf
+#My functions
+from my_functions.assemble import delimiters, filter, gen_gdf, names
 from my_functions.ESAM_segment import segment, segment_utils
 from my_functions.samplers import samplers, samplers_utils
 from my_functions.geo_datasets import geoDatasets
 from my_functions.configs import SegmentConfig, DetectConfig
-from my_functions.assemble import names
-from my_functions.detect import detect
+from my_functions.detect import detect, detect_utils
 from my_functions import output
-
 from my_functions import plotting_utils
-from my_functions.detect import detect_utils
 
-import matplotlib.pyplot as plt
-
+#GroundingDino
 from groundingdino.util.inference import load_model as GD_load_model
 from groundingdino.util.inference import predict as GD_predict
 
-import geopandas as gpd
-import supervision as sv
+#Deep forest
+from deepforest import main
 
 # Ignore all warnings
 warnings.filterwarnings('ignore')
@@ -98,8 +100,28 @@ class Mosaic:
             road_mask = np.zeros((tile_h, tile_w))
         return road_mask  #shape: (h, w)
     
-    def detect_trees_tile(self, tile_path, georef = True):
-        #TODO rimuovere le box duplicate quando c'è overlap tra le patch
+    def detect_trees_tile_DeepForest(self, tile_path) -> Tuple[np.ndarray, ...]:
+        config = self.event.det_config
+        model = main.deepforest(config_args = {"devices" : config.DF_device,
+                                               'retinanet': {'score_thresh': config.DF_box_threshold},
+                                               'accelerator': 'cuda'})
+        model.use_release()
+        
+        boxes_df = model.predict_tile(tile_path,
+                                   return_plot = False,
+                                   patch_size = config.DF_patch_size,
+                                   patch_overlap = config.DF_patch_overlap)
+        
+        
+        boxes = boxes_df.iloc[:, :4].values
+        score = boxes_df['score'].values
+        
+        del model
+        torch.cuda.empty_cache()
+        
+        return boxes, score
+    
+    def detect_trees_tile_GD(self, tile_path) -> Tuple[np.ndarray, np.ndarray]:
         det_config = self.event.det_config
         
         #load model
@@ -111,8 +133,9 @@ class Mosaic:
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
         glb_tile_tree_boxes = torch.empty(0, 4)
+        all_logits = torch.empty(0)
                
-        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc="Detecting Trees"):
+        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees"):
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
             
             for img, img_top_left_index in zip(img_b, batch['top_lft_index']):
@@ -134,40 +157,68 @@ class Mosaic:
                 glb_xyxy_tree_boxes = rel_xyxy_tree_boxes + top_left_xy
                 
                 glb_tile_tree_boxes = np.concatenate((glb_tile_tree_boxes, glb_xyxy_tree_boxes))
-                
-            #if batch_ix == 50:
-            #    break
-            
+                all_logits = np.concatenate((all_logits, logits))
         
-        #del model and free GPU!
+        #del model and free GPU
         del model
         torch.cuda.empty_cache()
         
-        #TODO: scrivere meglio la funzione filter_on_box_area_mt2
-        keep_ix_box_area = detect_utils.filter_on_box_area_mt2(glb_tile_tree_boxes, 0.0, 0.0,
-                                                      min_area_mt2 = 0,
-                                                      max_area_mt2 = det_config.max_area_GD_boxes_mt2,
-                                                      box_format = 'xyxy')
+        return  glb_tile_tree_boxes, all_logits        
+    
+    def detect_trees_tile(self, tile_path, georef = True):
+        with rasterio.open(tile_path) as src:
+            to_xy = src.xy
+            crs = src.crs
+            
+        config = self.event.det_config
+        
+        GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path)
+        deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
+        
+        glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
+        glb_tile_tree_scores = np.concatenate((GD_scores, deepForest_scores))
+        
+        print('Number of tree boxes before filtering: ', len(glb_tile_tree_boxes))
+        
+        det_config = self.event.det_config
+        
+        keep_ix_box_area = detect_utils.filter_on_box_area_mt2(glb_tile_tree_boxes,
+                                                               max_area_mt2 = det_config.max_area_GD_boxes_mt2,
+                                                               box_format = 'xyxy')
+        glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_box_area]
+        glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_box_area]
+        print('boxes area filtering: ', len(keep_ix_box_area) - np.sum(keep_ix_box_area), 'boxes removed')
         
         keep_ix_box_ratio = detect_utils.filter_on_box_ratio(glb_tile_tree_boxes,
                                                              min_edges_ratio = det_config.min_ratio_GD_boxes_edges,
                                                              box_format = 'xyxy')
+        glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_box_ratio]
+        glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_box_ratio]
+        print('box edge ratio filtering:', len(keep_ix_box_ratio) - np.sum(keep_ix_box_ratio), 'boxes removed')
         
-        keep_ix  = keep_ix_box_area & keep_ix_box_ratio
-    
-        glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix]
+        keep_ix_nms = torchvision.ops.nms(torch.tensor(glb_tile_tree_boxes), torch.tensor(glb_tile_tree_scores), config.nms_threshold)
+        len_bf_nms = len(glb_tile_tree_boxes)
+        glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_nms]
+        glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_nms]
+        print('nms filtering:', len_bf_nms - len(keep_ix_nms), 'boxes removed')
         
-        print('Number of tree boxes after filtering: ', len(glb_tile_tree_boxes))
+        print('Number of tree boxes after all filtering: ', len(glb_tile_tree_boxes))
         
         if georef: #create a gdf with the boxes in proj coordinates
             for i, box in enumerate(glb_tile_tree_boxes):
                 #need to invert x and y to go from col row to row col index
-                glb_tile_tree_boxes[i] = np.array(dataset.to_xy(box[1], box[0]) + dataset.to_xy(box[3], box[2]))
-            gdf = gpd.GeoDataFrame(geometry=[samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes], crs = dataset.crs)
+                glb_tile_tree_boxes[i] = np.array(to_xy(box[1], box[0]) + to_xy(box[3], box[2]))
+                
+            cols = {'score': list(glb_tile_tree_scores),
+                    'geometry': [samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes]}
+            
+            gdf = gpd.GeoDataFrame(cols, crs = crs)
+            #gdf = gpd.GeoDataFrame(geometry=[samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes], crs = crs)
+            
             return gdf
         
         return glb_tile_tree_boxes #xyxy format, global index
-                
+              
     def seg_tree_and_build_rnd_samples(self, tile_path, title: str = None):
         if self.build_gdf is None:
             self.set_build_gdf()

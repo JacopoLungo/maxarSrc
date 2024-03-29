@@ -33,7 +33,7 @@ def get_all_events(data_root = '/mnt/data2/vaschetti_data/maxar'):
     for event_name in glob.glob('**/*.tif', recursive = True, root_dir=data_root):
         if event_name.split('/')[0] not in all_events:
             all_events.append(event_name.split('/')[0])
-    return list(all_events)
+    return sorted(list(all_events))
 
 
 def get_mosaics_names(event_name, data_root = '/mnt/data2/vaschetti_data/maxar', when = None):
