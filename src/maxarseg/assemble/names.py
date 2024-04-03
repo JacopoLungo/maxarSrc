@@ -4,7 +4,7 @@ import glob
 import os
 
 
-def get_region_name(event_name, metadata_root = '/home/vaschetti/maxarSrc/metadata'):
+def get_region_name(event_name, metadata_root = './metadata'):
     """
     Get the region associate with the input event.
     It is based in the event_id2State2Region.csv file.

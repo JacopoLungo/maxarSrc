@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 
-def building_gdf(country, csv_path = '/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
+def building_gdf(country, csv_path = './metadata/buildings_dataset_links.csv', dataset_crs = None, quiet = False):
     """
     Returns a geodataframe with the buildings of the country passed as input.
     It downloads the dataset from a link in the dataset-links.csv file.

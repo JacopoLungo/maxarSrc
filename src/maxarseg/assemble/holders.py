@@ -603,9 +603,14 @@ class Mosaic:
         for j, out_name in enumerate(out_names):
             output.single_mask2Tif(tile_path, no_overlap_masks[j], out_name = out_name, out_dir_root = out_dir_root)
     
-    def segment_all_tiles(self):
-        for tile_path in self.tiles_paths:
-            self.segment_tile(tile_path) 
+    def segment_all_tiles(self, out_dir_root, verbose = True):
+        if verbose:
+            for tile_path in tqdm(self.tiles_paths, desc = f'Segmenting {self.name}'):
+                self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det = True)
+        else:        
+            for tile_path in self.tiles_paths:
+                self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det = True) 
+
 
 
 class Event:
@@ -614,8 +619,8 @@ class Event:
                  seg_config: SegmentConfig = None,
                  det_config: DetectConfig = None,
                  when = 'pre', #'pre', 'post', None or 'None'
-                 maxar_root = '/mnt/data2/vaschetti_data/maxar',
-                 maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
+                 maxar_root = '/nfs/projects/overwatch/maxar-open-data',
+                 maxar_metadata_path = './metadata/from_github_maxar_metadata/datasets',
                  region = 'infer'):
         #Configs
         self.seg_config = seg_config
@@ -623,14 +628,14 @@ class Event:
         
         #Paths
         self.maxar_root = Path(maxar_root)
-        self.buildings_ds_links_path = Path('/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv')
+        self.buildings_ds_links_path = Path('./metadata/buildings_dataset_links.csv')
         self.maxar_metadata_path = Path(maxar_metadata_path)
         
         #Event
         self.name = name
         self.when = when
         self.region_name = names.get_region_name(self.name) if region == 'infer' else region
-        self.bbox = delimiters.get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
+        self.bbox = delimiters.get_event_bbox(self.name, maxar_root, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = names.get_mosaics_names(self.name, self.maxar_root, self.when)
     
         #Roads
@@ -675,6 +680,6 @@ class Event:
         return self.mosaics[mosaic_name]
     
     #Segment methods
-    def seg_all_mosaics(self):
+    def seg_all_mosaics(self, out_dir_root):
         for __, mosaic in self.mosaics.items():
-            mosaic.segment_all_tiles()
+            mosaic.segment_all_tiles(out_dir_root=out_dir_root)

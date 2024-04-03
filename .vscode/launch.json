@@ -5,10 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Module",
+            "name": "main_seg_tile",
             "type": "debugpy",
             "request": "launch",
             "module": "maxarseg.main_seg_tile"
+        },
+        {
+            "name": "main_seg_tile_glbl_detections",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "maxarseg.main_seg_tile_glbl_detections"
         }
     ]
 }

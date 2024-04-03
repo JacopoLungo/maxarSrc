@@ -24,7 +24,7 @@ from maxarseg.samplers_utils import path_2_tilePolygon
 # Retrieve bbox coordinates 
 ###########################
 
-def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_name, roads_root = '/mnt/data2/vaschetti_data/MS_roads'):
+def old_get_bbox_roads(mosaic_bbox: Union[List[Tuple], Tuple[Tuple]], region_name, roads_root = '/nfs/projects/overwatch/microsoft-roads'):
     """
     Get a gdf containing the roads that intersect the mosaic_bbox.
     Input:

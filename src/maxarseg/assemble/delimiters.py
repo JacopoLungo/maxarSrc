@@ -5,7 +5,7 @@ from typing import List, Tuple, Union
 from maxarseg.assemble import names
 import pyproj
 
-def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets', extra_mt = 0, return_proj_coords = False):
+def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = './metadata/from_github_maxar_metadata/datasets', extra_mt = 0, return_proj_coords = False):
     """
     Get the bbox of a mosaic. It return the coordinates of the bottom left and top right corners.
     Input:
@@ -56,7 +56,7 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = '/home/vasch
     return ((minx, miny), (maxx, maxy)), gdf['proj:epsg'].values[0]
 
 
-def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = False):
+def get_event_bbox(event_name, maxar_root, extra_mt = 0, when = None, return_proj_coords = False):
     
     minx = sys.maxsize
     miny = sys.maxsize
@@ -65,7 +65,7 @@ def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = F
 
     crs_set = set()
     first_crs = None
-    for mosaic_name in names.get_mosaics_names(event_name, when = when):
+    for mosaic_name in names.get_mosaics_names(event_name, when = when, data_root=maxar_root):
         ((tmp_minx, tmp_miny), (tmp_maxx, tmp_maxy)), crs = get_mosaic_bbox(event_name, mosaic_name, extra_mt = extra_mt, return_proj_coords = True)
         first_crs = crs if first_crs is None else first_crs
         transformer = pyproj.Transformer.from_crs(crs, first_crs)

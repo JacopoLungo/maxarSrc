@@ -3,7 +3,7 @@ from tqdm import tqdm
 import pandas as pd
 
 def main():
-    df = pd.read_csv('/home/vaschetti/maxarSrc/output/stats_roadnBuild.csv')
+    df = pd.read_csv('./output/stats_roadnBuild.csv')
     print(df)
     tot_buildings = 0
     tot_roads = 0 
@@ -29,13 +29,13 @@ def main():
             print(f'Event: {event_name}, Total buildings: {event_build_num}, Total roads: {event_road_num}')
         except Exception as e:
             print(f'Error in {event_name}')
-            df.to_csv('/home/vaschetti/maxarSrc/output/stats_roadnBuild.csv', index=False)
+            df.to_csv('./output/stats_roadnBuild.csv', index=False)
             print(f"Caught an exception: {e}")
             return
 
     print('Total buildings: ', tot_buildings)
     print('Total roads: ', tot_roads)
-    df.to_csv('/home/vaschetti/maxarSrc/output/stats_roadnBuild.csv', index=False)
+    df.to_csv('./output/stats_roadnBuild.csv', index=False)
     return
 
 if __name__ == "__main__":

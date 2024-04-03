@@ -17,7 +17,7 @@ class SegmentConfig:
                  stride = 400,
                  
                  device = 'cuda',
-                 GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
+                 GD_root = "./models/GDINO",
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
                  GD_weights = "groundingdino_swint_ogc.pth",
                  
@@ -32,7 +32,7 @@ class SegmentConfig:
                  road_width_mt = 5,
                  ext_mt_build_box = 0,
                  
-                 ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
+                 ESAM_root = './models/EfficientSAM',
                  ESAM_num_parall_queries = 5,
                  smooth_patch_overlap = False,
                  use_separate_detect_config = False):
@@ -84,7 +84,7 @@ class DetectConfig:
                  stride = 400,
                  
                  device = 'cuda',
-                 GD_root = "/home/vaschetti/maxarSrc/models/GDINO",
+                 GD_root = "./models/GDINO",
                  GD_config_file = "GroundingDINO_SwinT_OGC.py",
                  GD_weights = "groundingdino_swint_ogc.pth",
                  

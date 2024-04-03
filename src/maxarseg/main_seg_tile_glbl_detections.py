@@ -1,28 +1,20 @@
 import argparse
-import glob
-import rasterio
-from pathlib import Path
-import os
-import reverse_geocoder as rg
-import pyproj
-import geopandas as gpd
-import sys
-
-if Path.cwd().name != 'src':
-    os.chdir('/home/vaschetti/maxarSrc/src')
+import torch
 
 from maxarseg.assemble import names
 from maxarseg.assemble import holders
 
 from maxarseg.configs import SegmentConfig, DetectConfig
 
+data_root = '/nfs/projects/overwatch/maxar-open-data'
+
 def main(): 
 
-    events_names = names.get_all_events()
+    events_names = names.get_all_events(data_root=data_root)
     
     parser = argparse.ArgumentParser(description='Segment Maxar Tiles')
     #event
-    parser.add_argument('--event_ix', default = 6, type = int, help='Index of the event in the list events_names')
+    parser.add_argument('--event_ix', default = 1, type = int, help='Index of the event in the list events_names')
     parser.add_argument('--when', default = 'pre', choices=['pre', 'post', 'None'], help='Select the pre or post event mosaics')
     
     #Detect config
@@ -32,9 +24,9 @@ def main():
     parser.add_argument('--size_det', default = 600, type = int, help = 'Size of the patch for detection')
     parser.add_argument('--stride_det', default = 400, type = int, help = 'Stride of the patch for detection')
     
-    parser.add_argument('--GD_root', default = "/home/vaschetti/maxarSrc/models/GDINO", help = 'Root of the grounding dino model')
-    parser.add_argument('--GD_config_file', default = "GroundingDINO_SwinT_OGC.py", help = 'Config file of the grounding dino model')
-    parser.add_argument('--GD_weights', default = "groundingdino_swint_ogc.pth", help = 'Weights of the grounding dino model')
+    parser.add_argument('--GD_root', default = "./models/GDINO", help = 'Root of the grounding dino model')
+    parser.add_argument('--GD_config_file', default = "configs/GroundingDINO_SwinT_OGC.py", help = 'Config file of the grounding dino model')
+    parser.add_argument('--GD_weights', default = "weights/groundingdino_swint_ogc.pth", help = 'Weights of the grounding dino model')
     
     parser.add_argument('--text_prompt', default = 'green tree', help = 'Prompt for the grounding dino model')
     parser.add_argument('--box_threshold', default = 0.15, type = float, help = 'Threshold for the grounding dino model')
@@ -56,14 +48,22 @@ def main():
     parser.add_argument('--road_width_mt', default = 5, type = int, help = 'Width of the road')    
     
     #Efficient SAM
-    parser.add_argument('--ESAM_root', default = '/home/vaschetti/maxarSrc/models/EfficientSAM', help = 'Root of the efficient sam model')
+    parser.add_argument('--ESAM_root', default = './models/EfficientSAM', help = 'Root of the efficient sam model')
     parser.add_argument('--ESAM_num_parall_queries', default = 5, type = int, help = 'Set the number of paraller queries to be processed')
-    parser.add_argument('--out_dir_root', default = "/home/vaschetti/maxarSrc/output/tiff", help='output directory root')
+    parser.add_argument('--out_dir_root', default = "./output/tiff", help='output directory root')
 
     args = parser.parse_args()
         
     print("Selected Event: ", events_names[args.event_ix])
     
+
+    # check if cuda is available in the system, if it is set the device to cuda
+    if torch.cuda.is_available():
+        args.device_det = 'cuda:0'
+        args.device_seg = 'cuda:0'
+    else:
+        args.device_det = 'cpu'
+        args.device_seg = 'cpu'
     
     det_config = DetectConfig(
                             batch_size = args.bs_det,
@@ -97,14 +97,13 @@ def main():
     
     all_mosaics_names = event.all_mosaics_names
     
+    event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
     
-    #event.seg_all_mosaics() #this segment all the mosiacs in the event
+    # m0 = event.mosaics[all_mosaics_names[0]]
+    # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
     
-    m0 = event.mosaics[all_mosaics_names[0]]
-    #m0.segment_all_tiles() #this segment all tiles in the mosaic
-    
-    m0_tile_17_path = m0.tiles_paths[17]
-    m0.segment_tile(m0_tile_17_path, args.out_dir_root, glbl_det = True)
+    # m0_tile_17_path = m0.tiles_paths[17]
+    # m0.segment_tile(m0_tile_17_path, args.out_dir_root, glbl_det = True)
 
 
 if __name__ == "__main__":

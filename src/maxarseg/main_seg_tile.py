@@ -2,6 +2,7 @@ import argparse
 from maxarseg.assemble import names
 from maxarseg.assemble import holders
 from maxarseg.configs import SegmentConfig
+import torch
 
 data_root = '/nfs/projects/overwatch/maxar-open-data'
 
@@ -16,15 +17,15 @@ def main():
     
     #CONFIG
     parser.add_argument('--bs', default = 2, type = int, help = 'Batch size for the dataloader')
-    parser.add_argument('--device', default = 'cuda:0', help='device to use')
+    parser.add_argument('--device', default = 'cpu', help='device to use')
     #patch
     parser.add_argument('--size', default = 600, type = int, help = 'Size of the patch')
     parser.add_argument('--stride', default = 400, type = int, help = 'Stride of the patch')
     
     #Grounding Dino - Trees
-    parser.add_argument('--GD_root', default = "/home/vaschetti/maxarSrc/models/GDINO", help = 'Root of the grounding dino model')
-    parser.add_argument('--GD_config_file', default = "GroundingDINO_SwinT_OGC.py", help = 'Config file of the grounding dino model')
-    parser.add_argument('--GD_weights', default = "groundingdino_swint_ogc.pth", help = 'Weights of the grounding dino model')
+    parser.add_argument('--GD_root', default = "./models/GDINO", help = 'Root of the grounding dino model')
+    parser.add_argument('--GD_config_file', default = "configs/GroundingDINO_SwinT_OGC.py", help = 'Config file of the grounding dino model')
+    parser.add_argument('--GD_weights', default = "weights/groundingdino_swint_ogc.pth", help = 'Weights of the grounding dino model')
     
     parser.add_argument('--text_prompt', default = 'green tree', help = 'Prompt for the grounding dino model')
     parser.add_argument('--box_threshold', default = 0.15, type = float, help = 'Threshold for the grounding dino model')
@@ -40,17 +41,21 @@ def main():
     #Roads
     parser.add_argument('--road_width_mt', default = 5, type = int, help = 'Width of the road')
     
-    
     #Efficient SAM
-    parser.add_argument('--ESAM_root', default = '/home/vaschetti/maxarSrc/models/EfficientSAM', help = 'Root of the efficient sam model')
+    parser.add_argument('--ESAM_root', default = './models/EfficientSAM', help = 'Root of the efficient sam model')
     parser.add_argument('--ESAM_num_parall_queries', default = 5, type = int, help = 'Set the number of paraller queries to be processed')
     
-    
-    parser.add_argument('--out_dir_root', default = "/home/vaschetti/maxarSrc/output/tiff", help='output directory root')
+    parser.add_argument('--out_dir_root', default = "./output/tiff", help='output directory root')
 
     args = parser.parse_args()
         
     print("Selected Event: ", events_names[args.event_ix])
+
+    # check if cuda is available in the system, if it is set the device to cuda
+    if torch.cuda.is_available():
+        args.device = 'cuda:0'
+    else:
+        args.device = 'cpu'
     
     config = SegmentConfig(batch_size = args.bs,
                            size = args.size,
@@ -80,13 +85,13 @@ def main():
     all_mosaics_names = event.all_mosaics_names
     
     
-    #event.seg_all_mosaics() #this segment all the mosiacs in the event
+    # event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
     
     m0 = event.mosaics[all_mosaics_names[0]]
-    #m0.segment_all_tiles() #this segment all tiles in the mosaic
+    m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
     
-    m0_tile_17_path = m0.tiles_paths[17]
-    m0.segment_tile(m0_tile_17_path, args.out_dir_root)
+    # m0_tile_17_path = m0.tiles_paths[17]
+    # m0.segment_tile(m0_tile_17_path, args.out_dir_root)
 
 
 if __name__ == "__main__":

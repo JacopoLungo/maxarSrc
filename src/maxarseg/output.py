@@ -1,7 +1,7 @@
 import rasterio
 from pathlib import Path
 
-def single_mask2Tif(tile_path, mask, out_name, out_dir_root = '/home/vaschetti/maxarSrc/output/tiff'):
+def single_mask2Tif(tile_path, mask, out_name, out_dir_root = './output/tiff'):
     """
     Input:
     tile_path: str, path to the tile
