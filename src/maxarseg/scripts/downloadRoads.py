@@ -23,6 +23,6 @@ def download_roads(meta_root, output_folder):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--meta_root', type=str, default='./metadata')
-    parser.add_argument('--output_folder', type=str, default='/nfs/projects/overwatch/microsoft-roads')
+    parser.add_argument('--output_folder', type=str, default='/nfs/projects/overwatch/maxar-segmentation/microsoft-roads')
     args = parser.parse_args()
     download_roads(args.meta_root, args.output_folder)

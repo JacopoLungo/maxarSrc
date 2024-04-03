@@ -4,7 +4,7 @@ from maxarseg.assemble import holders
 from maxarseg.configs import SegmentConfig
 import torch
 
-data_root = '/nfs/projects/overwatch/maxar-open-data'
+data_root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data'
 
 def main(): 
 

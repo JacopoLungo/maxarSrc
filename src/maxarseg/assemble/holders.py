@@ -619,7 +619,7 @@ class Event:
                  seg_config: SegmentConfig = None,
                  det_config: DetectConfig = None,
                  when = 'pre', #'pre', 'post', None or 'None'
-                 maxar_root = '/nfs/projects/overwatch/maxar-open-data',
+                 maxar_root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data',
                  maxar_metadata_path = './metadata/from_github_maxar_metadata/datasets',
                  region = 'infer'):
         #Configs

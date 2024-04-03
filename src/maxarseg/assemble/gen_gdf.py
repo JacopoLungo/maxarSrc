@@ -63,7 +63,7 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
         gdfs = gdfs.to_crs(dataset_crs)
     return gdfs
 
-def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/microsoft-roads'):
+def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/maxar-segmentation/microsoft-roads'):
     #TODO: cercare di velocizzare la lettura dei dati delle strade
     """
     Get a gdf containing the roads of a region.
