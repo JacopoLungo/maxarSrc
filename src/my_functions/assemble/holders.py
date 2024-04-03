@@ -79,8 +79,11 @@ class Mosaic:
     def set_build_gdf(self):
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
-        self.proj_build_gdf =  self.build_gdf.to_crs(self.crs)
         self.build_num = len(self.build_gdf)
+        if self.build_num == 0: #here use google buildings
+            return None
+        self.proj_build_gdf =  self.build_gdf.to_crs(self.crs)
+        
     
     def seg_road_tile(self, tile_path) -> np.array:
         seg_config = self.event.seg_config
@@ -218,7 +221,7 @@ class Mosaic:
             return gdf
         
         return glb_tile_tree_boxes #xyxy format, global index
-              
+
     def seg_tree_and_build_rnd_samples(self, tile_path, title: str = None):
         if self.build_gdf is None:
             self.set_build_gdf()
@@ -673,13 +676,13 @@ class Mosaic:
 
 class Event:
     def __init__(self,
-                 name,
-                 seg_config: SegmentConfig = None,
-                 det_config: DetectConfig = None,
-                 when = 'pre', #'pre', 'post', None or 'None'
-                 maxar_root = '/mnt/data2/vaschetti_data/maxar',
-                 maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
-                 region = 'infer'):
+                name,
+                seg_config: SegmentConfig = None,
+                det_config: DetectConfig = None,
+                when = 'pre', #'pre', 'post', None or 'None'
+                maxar_root = '/mnt/data2/vaschetti_data/maxar',
+                maxar_metadata_path = '/home/vaschetti/maxarSrc/metadata/from_github_maxar_metadata/datasets',
+                region = 'infer'):
         #Configs
         self.seg_config = seg_config
         self.det_config = det_config
@@ -695,7 +698,8 @@ class Event:
         self.region_name = names.get_region_name(self.name) if region == 'infer' else region
         self.bbox = delimiters.get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = names.get_mosaics_names(self.name, self.maxar_root, self.when)
-    
+        
+        print(f'Creating event: {self.name}\nRegion: {self.region_name}\nMosaics: {self.all_mosaics_names}')
         #Roads
         self.road_gdf = None
 
@@ -734,9 +738,16 @@ class Event:
             if mosaic.build_gdf is None:
                 self.set_build_gdf_in_mos(mosaic_name)
 
+    def get_roi_polygon(self, wkt: bool = False):
+        poly = samplers_utils.xyxy_2_Polygon(self.bbox)
+        if wkt:
+            return poly.wkt
+        else:
+            return poly
+    
     def get_mosaic(self, mosaic_name):
         return self.mosaics[mosaic_name]
-    
+
     #Segment methods
     def seg_all_mosaics(self):
         for __, mosaic in self.mosaics.items():
