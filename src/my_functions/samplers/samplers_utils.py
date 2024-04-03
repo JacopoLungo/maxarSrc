@@ -41,6 +41,18 @@ def boundingBox_2_Polygon(bounding_box):
     bbox_polyg = shapely.geometry.Polygon(vertices)
     return bbox_polyg
 
+def xyxy_2_Polygon(xyxy_box):
+    """
+    Create a shapely Polygon from a xyxy box
+    """
+    if not len(xyxy_box) == 4: #allow for a tuple of 2 points. E.g. ((minx, miny), (maxx, maxy))
+        minx, miny = xyxy_box[0]
+        maxx, maxy = xyxy_box[1]
+    else:    
+        minx, miny, maxx, maxy = xyxy_box
+    vertices = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny)]
+    return shapely.geometry.Polygon(vertices)
+
 def xyxyBox2Polygon(xyxy_box):
     """
     Create a shapely Polygon from a xyxy box
