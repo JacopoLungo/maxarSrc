@@ -346,8 +346,8 @@ class Mosaic:
                 print('Avg times (sec/batch)')
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 
-            if batch_ix == 50:
-                break
+            # if batch_ix == 50:
+            #     break
             
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
