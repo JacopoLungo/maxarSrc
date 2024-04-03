@@ -11,7 +11,7 @@
 
 all_mask: old method to segment a patch using SAM
 
-## Inside src/my_functions
+## Inside src/maxarseg
 ## build.py
 
 ### explore_folders.py
