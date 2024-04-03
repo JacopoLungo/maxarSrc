@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Tuple, Union
+from skimage import morphology
 
 def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img_x, 4)
                           building_boxes_b: List, 
@@ -188,13 +189,18 @@ def write_canvas_geo(canvas: np.array,
                     top_lft_indexes: List,
                     smooth: bool) -> np.array:
     """
-    Write the patch masks in the canvas
-    Inputs:
-        canvas: np.array of shape (channel, h_tile, w_tile)
-        patch_masks_b: np.array of shape (b, channel, h_patch, w_patch)
-        img_ixs: np.array of shape (b,)
-        smooth: bool. If True, it expects patch_mask to have logits, otherwise it should contains bools 
+    Write the patch masks in the canvas.
+
+    Args:
+        canvas (np.array): The canvas to write the patch masks on. It should have shape (channel, h_tile, w_tile).
+        patch_masks_b (np.array): The patch masks to be written on the canvas. It should have shape (b, channel, h_patch, w_patch).
+        top_lft_indexes (List): The top left indexes of each patch mask in the canvas.
+        smooth (bool): If True, it expects patch_mask to have logits, otherwise it should contain bools.
+
+    Returns:
+        np.array: The updated canvas with the patch masks written on it.
     """
+    
     size = patch_masks_b.shape[-1]
     for patch_mask, top_left_index in zip(patch_masks_b, top_lft_indexes):
         I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
@@ -212,4 +218,42 @@ def write_canvas_geo(canvas: np.array,
 
     return canvas 
     
+def clean_masks(masks: np.array, operations: str, distance: int) -> np.array:
+    """
+    Cleans the input masks by removing small holes and objects, and performs binary opening and closing operations.
+
+    Args:
+        masks (np.array): The input masks to be cleaned. Can be a single mask or a stack of masks
+        distance (int): The distance parameter for morphology operations.
+
+    Returns:
+        np.array: The cleaned masks. With dim equal to input masks.
+    """
+    if len(mask.shape) == 2:
+        single_mask = True
+        masks = np.expand_dims(mask, axis=0)
+    
+    clear_masks = []
+    
+    for mask in masks:
+        if operations == 'rmv_small':
+            clear_mask = morphology.remove_small_holes(mask, area_threshold=500)
+            clear_mask = morphology.remove_small_objects(clear_mask, min_size=500)
+        elif operations == 'bin':
+            clear_mask = morphology.binary_opening(mask)
+            clear_mask = morphology.binary_closing(clear_mask)
+        elif operations == 'all':
+            clear_mask = morphology.remove_small_holes(mask, area_threshold=500)
+            clear_mask = morphology.remove_small_objects(clear_mask, min_size=500)
+            clear_mask = morphology.binary_opening(clear_mask)
+            clear_mask = morphology.binary_closing(clear_mask)
+            
+        clear_masks.append(clear_mask)
+    if single_mask:
+        clear_masks = clear_masks[0]
+    else:
+        clear_masks = np.stack(clear_masks, axis=0)
+        
+    return clear_masks
+
 

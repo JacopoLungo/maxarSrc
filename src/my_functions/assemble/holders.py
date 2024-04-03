@@ -271,12 +271,14 @@ class Mosaic:
             
             #for each image, discern the masks in trees, buildings and padding
             patch_masks_b = segment_utils.discern_mode_smooth(all_masks_b, num_trees4img, num_build4img, mode = 'bchw') #(b, channel, h_patch, w_patch)
-            if False:
+            plot_logits = False
+            if not plot_logits:
                 patch_masks_b = np.greater_equal(patch_masks_b, 0) #turn logits into bool
+                
             
             #plotting
             for img, masks, tree_boxes, building_boxes in zip(img_b, patch_masks_b, tree_boxes_b, building_boxes_b):
-                if True: #plot logits
+                if plot_logits:
                     fig, axs = plt.subplots(1,3,figsize = (20, 20))
                     if title is not None:
                             fig.suptitle(title)
@@ -293,37 +295,49 @@ class Mosaic:
                     return masks[1] 
                     
                     
-                if False: #plot only trees
-                    fig, ax = plt.subplots(figsize = (15, 15))
-                    if title is not None:
-                            fig.suptitle(title)
-                    
-                    plotting_utils.show_img(img, ax=ax)
-                    plotting_utils.show_mask(masks[0], ax, rgb_color = (255, 18, 18), alpha = 0.4)
-                    plotting_utils.show_box(tree_boxes, ax, color='r', lw = 0.4)
+                else:
+                        
+                    if False: #plot only trees
+                        fig, ax = plt.subplots(figsize = (15, 15))
+                        if title is not None:
+                                fig.suptitle(title)
+                        
+                        plotting_utils.show_img(img, ax=ax)
+                        plotting_utils.show_mask(masks[0], ax, rgb_color = (255, 18, 18), alpha = 0.4)
+                        plotting_utils.show_box(tree_boxes, ax, color='r', lw = 0.4)
                 
-                if False: #plot trees and buildings  
-                    fig, axs = plt.subplots(1, 2, figsize = (16, 8))
-                    if title is not None:
-                        fig.suptitle(title)
-                    #plot trees and build separately
-                    plotting_utils.show_img(img, ax=axs[0])
-                    plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
-                    plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
-                    
-                    plotting_utils.show_img(img, ax = axs[1])
-                    plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
-                    plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
+                    else: #plot trees and buildings  
+                        clean_mask(masks[0])
+                        fig, axs = plt.subplots(1, 2, figsize = (16, 8))
+                        if title is not None:
+                            fig.suptitle(title)
+                        #plot trees and build separately
+                        plotting_utils.show_img(img, ax=axs[0])
+                        plotting_utils.show_mask(masks[0], axs[0], rgb_color = (255, 18, 18), alpha = 0.4)
+                        plotting_utils.show_box(tree_boxes, axs[0], color='r', lw = 0.4)
+                        
+                        plotting_utils.show_img(img, ax = axs[1])
+                        plotting_utils.show_mask(masks[1], axs[1], rgb_color = (131, 220, 242), alpha = 0.4)
+                        plotting_utils.show_box(building_boxes, axs[1], color='b', lw = 0.4)
     
-    def seg_glb_tree_and_build_tile(self, tile_path, debug_param_trees_gdf = None):
+    def seg_glb_tree_and_build_tile(self, tile_path: str, debug_param_trees_gdf = None, debug = False):
         """
         This method segment trees and buildings of a tile.
-        It does compute tree boxes at tile level, NOT at patch level. 
+        It does compute tree boxes at tile level, NOT at patch level.
+        
+        Args:
+            tile_path: path to the tile to segment
+            debug_param_trees_gdf: if not None, the tree boxes are not computed but are taken from this gdf
+            debug: if True, the method stops after 50 batches
+    
+        Returns:
+            canvas: a 3 channel mask with trees, buildings and padding. It contains bools
+        
         """
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
         
-        if debug_param_trees_gdf is None: 
+        if debug_param_trees_gdf is None:
             trees_gdf = self.detect_trees_tile(tile_path, georef = True)
         else:
             trees_gdf = debug_param_trees_gdf
@@ -400,9 +414,9 @@ class Mosaic:
                 print('Avg times (sec/batch)')
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 
-            if batch_ix == 50:
+            if debug and batch_ix == 50:
                 break
-            
+        
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
