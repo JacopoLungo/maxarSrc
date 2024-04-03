@@ -36,8 +36,12 @@ class SegmentConfig:
                  
                  ESAM_root = '/home/vaschetti/maxarSrc/models/EfficientSAM',
                  ESAM_num_parall_queries = 5,
-                 smooth_patch_overlap = False,
-                 use_separate_detect_config = False):
+                 smooth_patch_overlap = False, #if this is false, stride could be equal to size
+                 use_separate_detect_config = False,
+                 
+                 clean_masks_bool = False,
+                 rmv_holes_area_th = 80,
+                 rmv_small_obj_area_th = 80):
         
         #General
         self.batch_size = batch_size
@@ -69,6 +73,11 @@ class SegmentConfig:
         
         #Buildings
         self.ext_mt_build_box = ext_mt_build_box
+        
+        #Post proc
+        self.clean_masks_bool = clean_masks_bool
+        self.ski_rmv_holes_area_th = rmv_holes_area_th
+        self.rmv_small_obj_area_th = rmv_small_obj_area_th
         
         if not use_separate_detect_config:
             print('\n- GD model device:', next(self.GD_model.parameters()).device)

@@ -222,7 +222,7 @@ class Mosaic:
         
         return glb_tile_tree_boxes #xyxy format, global index
 
-    def seg_tree_and_build_rnd_samples(self, tile_path, title: str = None):
+    def seg_tree_and_build_rnd_samples(self, tile_path, title: str = None, **kwargs):
         if self.build_gdf is None:
             self.set_build_gdf()
         
@@ -299,8 +299,14 @@ class Mosaic:
                     
                     
                 else:
+                    clean_bool = kwargs.get('clean_bool', False)
+                    if clean_bool:
+                        masks = segment_utils.clean_masks(masks,
+                                                          operations = kwargs.get('operations'),
+                                                          area_threshold = kwargs.get('area_threshold'),
+                                                          min_size = kwargs.get('min_size')) #clean mask from small particles
                         
-                    if False: #plot only trees
+                    if True: #plot only trees
                         fig, ax = plt.subplots(figsize = (15, 15))
                         if title is not None:
                                 fig.suptitle(title)
@@ -309,8 +315,7 @@ class Mosaic:
                         plotting_utils.show_mask(masks[0], ax, rgb_color = (255, 18, 18), alpha = 0.4)
                         plotting_utils.show_box(tree_boxes, ax, color='r', lw = 0.4)
                 
-                    else: #plot trees and buildings  
-                        clean_mask(masks[0])
+                    else: #plot trees and buildings 
                         fig, axs = plt.subplots(1, 2, figsize = (16, 8))
                         if title is not None:
                             fig.suptitle(title)
@@ -417,8 +422,8 @@ class Mosaic:
                 print('Avg times (sec/batch)')
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 
-            if debug and batch_ix == 50:
-                break
+            #if True and batch_ix == 25:
+            #    break
         
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
@@ -630,11 +635,12 @@ class Mosaic:
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
         
-    def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False):
+    def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False, separate_masks = True):
         """
         glbl_det: if True tree detection are computed at tile level, if False at patch level
         """
-                        
+        seg_config = self.event.seg_config
+        
         if self.build_gdf is None:
             self.set_build_gdf()
         if self.road_gdf is None:
@@ -642,33 +648,37 @@ class Mosaic:
         
         tile_path = Path(tile_path)
         out_dir_root = Path(out_dir_root)
-        
-        ev_name, tl_when, mos_name, tl_name = tile_path.parts[-4:]
-        masks_names = ['road', 'tree', 'building']
-        out_names = [Path(ev_name) / tl_when / mos_name / (tl_name.split('.')[0] + '_' + mask_name + '.tif') for mask_name in masks_names]        
-        
+                
+        out_names = output.gen_names(tile_path, separate_masks)
+             
         (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
-
+       
         if not overwrite:
             for out_name in out_names:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
-        #tree_and_build_mask = self.seg_tree_and_build_tile(tile_path)
         if glbl_det:
             tree_and_build_mask = self.seg_glb_tree_and_build_tile(tile_path)
         else:
             tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
         road_mask = self.seg_road_tile(tile_path)
-        
-        #TODO: aggiungere post processing mask (tappare buchi, cancellare particelle)
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask[:-1]) , axis = 0)
-        
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         
-        for j, out_name in enumerate(out_names):
-            output.single_mask2Tif(tile_path, no_overlap_masks[j], out_name = out_name, out_dir_root = out_dir_root)
-    
+        if seg_config.clean_masks_bool:
+            print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
+            no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
+                                                         area_threshold = seg_config.ski_rmv_holes_area_th,
+                                                         min_size = seg_config.rmv_small_obj_area_th)
+        
+        output.masks2Tifs(tile_path,
+                          no_overlap_masks,
+                          out_names = out_names,
+                          separate_masks = separate_masks,
+                          out_dir_root = out_dir_root)
+        
+
     def segment_all_tiles(self):
         for tile_path in self.tiles_paths:
             self.segment_tile(tile_path) 

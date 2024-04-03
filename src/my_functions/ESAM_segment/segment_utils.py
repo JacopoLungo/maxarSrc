@@ -218,42 +218,60 @@ def write_canvas_geo(canvas: np.array,
 
     return canvas 
     
-def clean_masks(masks: np.array, operations: str, distance: int) -> np.array:
+def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
     """
-    Cleans the input masks by removing small holes and objects, and performs binary opening and closing operations.
+    Cleans the input masks by removing small holes and objects.
 
     Args:
-        masks (np.array): The input masks to be cleaned. Can be a single mask or a stack of masks
-        distance (int): The distance parameter for morphology operations.
+        masks (np.array): The input masks to be cleaned. Can be a single mask or a stack of masks.
+        area_threshold (int, optional): The area threshold for removing small holes. Defaults to 80.
+        min_size (int, optional): The minimum size for removing small objects. Defaults to 80.
 
     Returns:
-        np.array: The cleaned masks. With dim equal to input masks.
+        np.array: The cleaned masks. With the same dimensions as the input masks.
     """
-    if len(mask.shape) == 2:
+    single_mask = False
+    if len(masks.shape) == 2:
         single_mask = True
         masks = np.expand_dims(mask, axis=0)
     
     clear_masks = []
     
     for mask in masks:
-        if operations == 'rmv_small':
-            clear_mask = morphology.remove_small_holes(mask, area_threshold=500)
-            clear_mask = morphology.remove_small_objects(clear_mask, min_size=500)
-        elif operations == 'bin':
-            clear_mask = morphology.binary_opening(mask)
-            clear_mask = morphology.binary_closing(clear_mask)
-        elif operations == 'all':
-            clear_mask = morphology.remove_small_holes(mask, area_threshold=500)
-            clear_mask = morphology.remove_small_objects(clear_mask, min_size=500)
-            clear_mask = morphology.binary_opening(clear_mask)
-            clear_mask = morphology.binary_closing(clear_mask)
+            clear_mask = morphology.remove_small_holes(mask, area_threshold = area_threshold)
+            clear_mask = morphology.remove_small_objects(clear_mask, min_size = min_size)
             
-        clear_masks.append(clear_mask)
+            #clear_mask = morphology.binary_opening(mask)
+            #clear_mask = morphology.binary_closing(clear_mask)
+
+            clear_masks.append(clear_mask)
+            
     if single_mask:
         clear_masks = clear_masks[0]
     else:
         clear_masks = np.stack(clear_masks, axis=0)
         
     return clear_masks
+
+def merge_masks(masks: np.ndarray):
+    """
+    Merges multiple masks into a single mask.
+    Labels:
+        road = 0
+        tree = 1
+        building = 2
+        background = 255
+
+    Args:
+        masks (list): A list of masks to be merged.
+
+    Returns:
+        np.ndarray: The merged mask.
+    """
+    merged_mask = np.full_like(masks[0], fill_value=255, dtype=np.uint8)
+    for i, mask in enumerate(masks):
+        merged_mask[mask.astype(bool)] = i
+
+    return merged_mask
 
 

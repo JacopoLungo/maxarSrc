@@ -4,9 +4,13 @@ import geopandas as gpd
 import pandas as pd
 import os
 import argparse
+from pathlib import Path
+
+if Path.cwd().name != 'src':
+    os.chdir('/home/vaschetti/maxarSrc/src')
 
 # Read the csv file
-events_df = pd.read_csv('dateEventi.csv', sep=';')
+events_df = pd.read_csv('../metadata/dateEventi.csv', sep=';')
 # Create a dictionary with the event name as key and the date as value
 event2date = events_df.set_index('Aligned name')['date'].to_dict()
 
@@ -21,7 +25,7 @@ def get_pre_post_gdf_local(collection_id, event2date = event2date, local_gdf = T
         return None, None
 
     #Create the geodataframe
-    geojson_path = '/mnt/data2/vaschetti_data/maxar/metadata/from_github/datasets'
+    geojson_path = '../metadata/from_github_maxar_metadata/datasets'
     if local_gdf:
         gdf = gpd.read_file(os.path.join(geojson_path, collection_id + '.geojson'))
     else:
@@ -65,7 +69,7 @@ def download_event(collection_id, out_dir_root = "/mnt/data2/vaschetti_data/maxa
 def main():
     pareser = argparse.ArgumentParser(description='Download Maxar images')
     pareser.add_argument('--c_id', help='single or list of collection id you want to download')
-    pareser.add_argument('--out_dir', default = "/mnt/data2/vaschetti_data/maxar/",help='output directory')
+    pareser.add_argument('--out_dir', default = "/mnt/data2/vaschetti_data/maxar/", help='output directory')
 
     args = pareser.parse_args()
 
