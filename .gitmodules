@@ -1,3 +1,0 @@
-[submodule "creating_labels/models/EfficientSAM"]
-	path = creating_labels/models/EfficientSAM
-	url = https://github.com/yformer/EfficientSAM.git
