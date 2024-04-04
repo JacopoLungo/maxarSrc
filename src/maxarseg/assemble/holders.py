@@ -530,8 +530,8 @@ class Mosaic:
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 print(f'- post_proc: {(post_proc_total/(batch_ix + 1)):.4f}')
                 
-            if batch_ix == 50:
-                break
+            # if batch_ix == 50:
+            #     break
             
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
@@ -681,7 +681,9 @@ class Mosaic:
 
     def segment_all_tiles(self, out_dir_root):
         for tile_path in self.tiles_paths:
-            self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True) 
+
+            self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True, separate_masks=False) 
+            
 
 
 class Event:
