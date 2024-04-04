@@ -157,3 +157,5 @@ cython_debug/
 .vscode/
 outputs/
 .vscode/tasks.json
+
+.python-version
