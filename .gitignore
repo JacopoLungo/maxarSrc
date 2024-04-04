@@ -20,3 +20,4 @@ rnd.ipynb
 *.npy
 src/lightning_logs/
 *.gpkg
+.python-version
