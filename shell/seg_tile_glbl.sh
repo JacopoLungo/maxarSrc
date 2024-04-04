@@ -1,11 +1,11 @@
 #!/bin/bash
-python /home/vaschetti/maxarSrc/src/main_seg_tile_glbl_detections.py \
-        --event_ix 6 \
+python -m maxarseg.main_seg_tile_glbl_detections \
+        --event_ix 2 \
         --when pre \
         --bs_det 1 \
         --size_det 600 \
         --stride_det 600 \
-        --device_det cuda:3 \
+        --device_det cuda:0 \
         --text_prompt "bush" \
         --box_threshold 0.12 \
         --text_threshold 0.30 \
@@ -19,4 +19,4 @@ python /home/vaschetti/maxarSrc/src/main_seg_tile_glbl_detections.py \
         --ext_mt_build_box 0 \
         --road_width_mt 5 \
         --ESAM_num_parall_queries 5 \
-        --out_dir_root "/home/vaschetti/maxarSrc/output/tiff/to_delete"
+        --out_dir_root "./output/tiff"

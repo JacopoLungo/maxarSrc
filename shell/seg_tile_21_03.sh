@@ -1,5 +1,5 @@
 #!/bin/bash
-python /home/vaschetti/maxarSrc/src/main_seg_tile.py \
+python ./src/main_seg_tile.py \
         --event_ix 6 \
         --when pre \
         --bs 2 \
@@ -15,4 +15,4 @@ python /home/vaschetti/maxarSrc/src/main_seg_tile.py \
         --road_width_mt 5 \
         --ext_mt_build_box 0 \
         --ESAM_num_parall_queries 5 \
-        --out_dir_root "/home/vaschetti/maxarSrc/output/tiff"
+        --out_dir_root "./output/tiff"

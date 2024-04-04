@@ -13,9 +13,9 @@ True num of batch:  1760.0
 Number of tree boxes after filtering:  97869
 
 Total Time for 102 images:  291.6412949562073
-Mask written in /home/vaschetti/maxarSrc/output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_road.tif
-Mask written in /home/vaschetti/maxarSrc/output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_tree.tif
-Mask written in /home/vaschetti/maxarSrc/output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_building.tif
+Mask written in ./output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_road.tif
+Mask written in ./output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_tree.tif
+Mask written in ./output/tiff_to_delete/Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031233_building.tif
          366075310 function calls (346309526 primitive calls) in 927.561 seconds
 
    Ordered by: standard name
