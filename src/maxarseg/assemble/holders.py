@@ -1,7 +1,8 @@
 #Generic
 from pathlib import Path
 from tqdm import tqdm
-from time import time
+
+from time import time, perf_counter
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
@@ -699,11 +700,16 @@ class Mosaic:
                           out_dir_root = out_dir_root)
         
 
-    def segment_all_tiles(self, out_dir_root):
+    def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
-
+            start_time = perf_counter()
             self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True, separate_masks=False) 
-            
+            end_time = perf_counter() 
+            execution_time = end_time - start_time 
+            time_per_tile.append(execution_time)
+            print(f'Finished segmenting tile {tile_path} in {execution_time:.2f} seconds')
+            print(f'Average time per tile: {np.mean(time_per_tile):.2f} seconds')
+            return time_per_tile
 
 
 class Event:
@@ -718,6 +724,7 @@ class Event:
         #Configs
         self.seg_config = seg_config
         self.det_config = det_config
+        self.time_per_tile = []
         
         #Paths
         self.maxar_root = Path(maxar_root)
@@ -783,4 +790,5 @@ class Event:
     #Segment methods
     def seg_all_mosaics(self, out_dir_root):
         for __, mosaic in self.mosaics.items():
-            mosaic.segment_all_tiles(out_dir_root=out_dir_root)
+            times = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
+            self.time_per_tile.extend(times)

@@ -91,10 +91,10 @@ def main():
     
     all_mosaics_names = event.all_mosaics_names
     
-    # event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
+    event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
     
-    m0 = event.mosaics[all_mosaics_names[0]]
-    m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
+    # m0 = event.mosaics[all_mosaics_names[0]]
+    # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
     
     # m0_tile_17_path = m0.tiles_paths[17]
     # m0.segment_tile(m0_tile_17_path, args.out_dir_root, glbl_det = True)
