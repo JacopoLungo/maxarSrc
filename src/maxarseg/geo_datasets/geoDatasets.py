@@ -7,6 +7,8 @@ from torch import Tensor
 import re
 import sys
 import rasterio as rio
+from maxarseg.samplers import samplers_utils
+from rasterio.features import rasterize
 
 
 #TODO: pulire il codice sotto dai commenti
@@ -125,6 +127,11 @@ class MxrSingleTileNoEmpty(RasterDataset):
         with rio.open(self.files[0]) as src:
             self.to_index = src.index
             self.to_xy = src.xy
+            self.transform = src.transform
+            self.tile_shape = (src.height, src.width)
+        
+        self.tile_aoi = samplers_utils.path_2_tile_aoi(self.files[0])
+        self.aoi_mask = rasterize([self.tile_aoi], out_shape = self.tile_shape, fill=False, default_value=True, transform = self.transform)
     
     def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
         """Retrieve image/mask and metadata indexed by query.

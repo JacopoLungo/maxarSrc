@@ -10,7 +10,7 @@ from shapely.geometry.polygon import Polygon
 
 #from maxarseg import segment
 
-def path_2_tilePolygon(tile_path, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ):
+def path_2_tile_aoi(tile_path, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ):
     """
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
@@ -120,5 +120,5 @@ def tile_sizes(dataset: geoDatasets.MxrSingleTile):
     
     if x_size_pxl % 1 != 0 or y_size_pxl % 1 != 0:
         raise ValueError("The sizes of the tile are not integers")
-        
+    
     return (int(x_size_pxl), int(y_size_pxl))

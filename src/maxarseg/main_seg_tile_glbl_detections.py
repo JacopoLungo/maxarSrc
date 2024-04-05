@@ -11,11 +11,13 @@ def main():
     
     parser = argparse.ArgumentParser(description='Segment Maxar Tiles')
     #event
-    parser.add_argument('--event_ix', default = 2, type = int, help='Index of the event in the list events_names')
+    parser.add_argument('--event_ix', default = 16, type = int, help='Index of the event in the list events_names')
     parser.add_argument('--when', default = 'pre', choices=['pre', 'post', 'None'], help='Select the pre or post event mosaics')
     
     #Detect config
-    parser.add_argument('--bs_det', default = 1, type = int, help = 'Batch size for the detection')
+    parser.add_argument('--GD_bs', default = 1, type = int, help = 'Batch size for Grounding Dino')
+    parser.add_argument('--DF_bs', default = 1, type = int, help = 'Batch size for DeepForest')
+
     parser.add_argument('--device_det', default = 'cuda:0', help='device to use for detection')
     
     parser.add_argument('--size_det', default = 600, type = int, help = 'Size of the patch for detection')
@@ -59,7 +61,8 @@ def main():
         args.device_seg = 'cpu'
     
     det_config = DetectConfig(
-                            batch_size = args.bs_det,
+                            GD_batch_size = args.GD_bs,
+                            DF_batch_size = args.DF_bs,
                             size = args.size_det,
                             stride = args.stride_det,
                             device = args.device_det,
@@ -73,21 +76,21 @@ def main():
                             )
     
     seg_config = SegmentConfig(batch_size = args.bs_seg,
-                           size = args.size_seg,
-                           stride = args.stride_seg,
-                           device = args.device_seg,
-                           road_width_mt=args.road_width_mt,
-                           ext_mt_build_box=args.ext_mt_build_box,
-                           ESAM_root = args.ESAM_root,
-                           ESAM_num_parall_queries = args.ESAM_num_parall_queries,
-                           use_separate_detect_config=True,
-                           clean_masks_bool= True
-                           )
+                                size = args.size_seg,
+                                stride = args.stride_seg,
+                                device = args.device_seg,
+                                road_width_mt=args.road_width_mt,
+                                ext_mt_build_box=args.ext_mt_build_box,
+                                ESAM_root = args.ESAM_root,
+                                ESAM_num_parall_queries = args.ESAM_num_parall_queries,
+                                use_separate_detect_config=True,
+                                clean_masks_bool= True
+                                )
     
     event = holders.Event(events_names[args.event_ix],
-                          seg_config = seg_config,
-                          det_config = det_config,
-                          when=args.when)
+                        seg_config = seg_config,
+                        det_config = det_config,
+                        when=args.when)
     
     all_mosaics_names = event.all_mosaics_names
     

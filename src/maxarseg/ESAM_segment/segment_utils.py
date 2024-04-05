@@ -1,6 +1,8 @@
 import numpy as np
 from typing import List, Tuple, Union
 from skimage import morphology
+from shapely.geometry import Polygon
+
 
 def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img_x, 4)
                           building_boxes_b: List, 
@@ -157,7 +159,6 @@ def rmv_mask_overlap(overlapping_masks: np.array):
 
     return no_overlap_masks
 
-
 def write_canvas(canvas: np.array,
                  patch_masks_b: np.array,
                  img_ixs: np.array,
@@ -217,7 +218,7 @@ def write_canvas_geo(canvas: np.array,
             canvas[I] = patch_mask[:, :max_idxs[0], :max_idxs[1]]
 
     return canvas 
-    
+
 def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
     """
     Cleans the input masks by removing small holes and objects.
@@ -273,5 +274,3 @@ def merge_masks(masks: np.ndarray):
         merged_mask[mask.astype(bool)] = i
 
     return merged_mask
-
-

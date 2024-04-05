@@ -15,6 +15,7 @@ import supervision as sv
 from typing import Tuple
 import matplotlib.pyplot as plt
 import os
+import sys
 
 #My functions
 from maxarseg.assemble import delimiters, filter, gen_gdf, names
@@ -79,25 +80,33 @@ class Mosaic:
     def set_build_gdf(self):
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
-        self.build_num = len(self.build_gdf)
-        if self.build_num == 0: #here use google buildings
-            return None
-        self.proj_build_gdf =  self.build_gdf.to_crs(self.crs)
+
+        if len(self.build_gdf) == 0: #here use google buildings
+            self.build_gdf = gen_gdf.google_building_gdf(event_name=self.event.name, bbox=self.bbox)
+            if len(self.build_gdf) == 0:
+                raise Exception('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                
+        self.proj_build_gdf = self.build_gdf.to_crs(self.crs)
         
-    
     def seg_road_tile(self, tile_path) -> np.array:
         seg_config = self.event.seg_config
         with rasterio.open(tile_path) as src:
             transform = src.transform
             tile_h = src.height
             tile_w = src.width
+            tile_shape = (tile_h, tile_w)
+        
+        tile_aoi = samplers_utils.path_2_tile_aoi(tile_path)
+        aoi_mask = rasterize([tile_aoi], out_shape = tile_shape, fill=False, default_value=True, transform = transform)
+
             #out_meta = src.meta.copy()
-        query_bbox_poly = samplers_utils.path_2_tilePolygon(tile_path)
+        query_bbox_poly = samplers_utils.path_2_tile_aoi(tile_path)
         road_lines = self.proj_road_gdf[self.proj_road_gdf.geometry.intersects(query_bbox_poly)]
 
         if len(road_lines) != 0:
             buffered_lines = road_lines.geometry.buffer(seg_config.road_width_mt)
             road_mask = rasterize(buffered_lines, out_shape=(tile_h, tile_w), transform=transform)
+            road_mask = np.where(aoi_mask, road_mask, False)
         else:
             print('No roads')
             road_mask = np.zeros((tile_h, tile_w))
@@ -105,15 +114,16 @@ class Mosaic:
     
     def detect_trees_tile_DeepForest(self, tile_path) -> Tuple[np.ndarray, ...]:
         config = self.event.det_config
-        model = main.deepforest(config_args = {"devices" : config.DF_device,
-                                               'retinanet': {'score_thresh': config.DF_box_threshold},
-                                               'accelerator': 'cuda'})
+        model = main.deepforest(config_args = { 'devices' : config.DF_device,
+                                                'retinanet': {'score_thresh': config.DF_box_threshold},
+                                                'accelerator': 'cuda',
+                                                'batch_size': config.DF_batch_size})
         model.use_release()
         
         boxes_df = model.predict_tile(tile_path,
-                                   return_plot = False,
-                                   patch_size = config.DF_patch_size,
-                                   patch_overlap = config.DF_patch_overlap)
+                                    return_plot = False,
+                                    patch_size = config.DF_patch_size,
+                                    patch_overlap = config.DF_patch_overlap)
         
         
         boxes = boxes_df.iloc[:, :4].values
@@ -132,12 +142,12 @@ class Mosaic:
         print('\n- GD model device:', next(model.parameters()).device)
         
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
-        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=det_config.batch_size, size=det_config.size, stride=det_config.stride)
+        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=det_config.GD_batch_size, size=det_config.size, stride=det_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
         glb_tile_tree_boxes = torch.empty(0, 4)
         all_logits = torch.empty(0)
-               
+        
         for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees"):
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
             
@@ -354,9 +364,9 @@ class Mosaic:
 
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
         sampler = samplers.BatchGridGeoSampler(dataset,
-                                               batch_size=seg_config.batch_size,
-                                               size=seg_config.size,
-                                               stride=seg_config.stride)
+                                            batch_size=seg_config.batch_size,
+                                            size=seg_config.size,
+                                            stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
         canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
@@ -374,7 +384,7 @@ class Mosaic:
                                                                 proj_gdf = trees_gdf,
                                                                 dataset_res = dataset.res,
                                                                 ext_mt = 0)
-  
+
             #BUILDINGS
             #get the building boxes in batches and the number of buildings for each image
             #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
@@ -426,6 +436,10 @@ class Mosaic:
             #    break
         
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
+                
+        #bool np.array False outside the aoi
+        canvas = np.where(dataset.aoi_mask, canvas, False)
+
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
 
@@ -650,9 +664,9 @@ class Mosaic:
         out_dir_root = Path(out_dir_root)
                 
         out_names = output.gen_names(tile_path, separate_masks)
-             
+
         (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
-       
+        
         if not overwrite:
             for out_name in out_names:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
@@ -673,12 +687,11 @@ class Mosaic:
                                                          min_size = seg_config.rmv_small_obj_area_th)
         
         output.masks2Tifs(tile_path,
-                          no_overlap_masks,
-                          out_names = out_names,
-                          separate_masks = separate_masks,
-                          out_dir_root = out_dir_root)
+                        no_overlap_masks,
+                        out_names = out_names,
+                        separate_masks = separate_masks,
+                        out_dir_root = out_dir_root)
         
-
     def segment_all_tiles(self, out_dir_root):
         for tile_path in self.tiles_paths:
             self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True) 

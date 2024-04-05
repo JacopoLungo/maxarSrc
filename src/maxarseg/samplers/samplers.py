@@ -1,7 +1,7 @@
 from torchgeo.samplers.utils import get_random_bounding_box, tile_to_chips
 from torchgeo.samplers.single import RandomGeoSampler, GridGeoSampler
 from torchgeo.datasets import GeoDataset, BoundingBox
-from maxarseg.samplers.samplers_utils import path_2_tilePolygon, boundingBox_2_Polygon, boundingBox_2_centralPoint
+from maxarseg.samplers.samplers_utils import path_2_tile_aoi, boundingBox_2_Polygon, boundingBox_2_centralPoint
 from torchgeo.samplers.constants import Units
 from typing import Optional, Union
 from collections.abc import Iterator
@@ -42,7 +42,7 @@ class MyRandomGeoSampler(RandomGeoSampler):
             hit = self.hits[idx]
 
             tile_path = hit.object
-            tile_polyg = path_2_tilePolygon(tile_path)
+            tile_polyg = path_2_tile_aoi(tile_path)
 
             bounds = BoundingBox(*hit.bounds) #TODO: ridurre i bounds usando il bbox del geojson
             # Choose a random index within that tile
@@ -85,7 +85,7 @@ class MyGridGeoSampler(GridGeoSampler):
         # For each tile...
         for hit in self.hits: #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
             tile_path = hit.object
-            tile_polygon = path_2_tilePolygon(tile_path)
+            tile_polygon = path_2_tile_aoi(tile_path)
 
             #print('In sampler')
             #print('tile_polygon: ', tile_polygon)
@@ -218,7 +218,7 @@ class WholeTifGridGeoSampler(GridGeoSampler):
         # For each tile...
         for k, hit in enumerate(self.hits): #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
             tile_path = hit.object
-            tile_polygon = path_2_tilePolygon(tile_path)
+            tile_polygon = path_2_tile_aoi(tile_path)
 
             bounds = BoundingBox(*hit.bounds)
             rows, cols = tile_to_chips(bounds, self.size, self.stride)
@@ -280,6 +280,7 @@ class BatchGridGeoSampler(GridGeoSampler):
     Sample a batch of bounding boxes from a dataset in a grid fashion.
     Check if the bounding box is inside the tile's polygon.
     Discard empty patches.
+    This should be used with a dataset with only ONE tile.
     """
     def __init__(self,
         dataset: GeoDataset,
@@ -302,8 +303,6 @@ class BatchGridGeoSampler(GridGeoSampler):
         batch = []
         # For each tile...
         for k, hit in enumerate(self.hits): #These hits are all the tiles that intersect the roi (region of interest). If roi not specified then hits = all the tiles
-            tile_path = hit.object
-            tile_polygon = path_2_tilePolygon(tile_path)
 
             #print('In sampler')
             #print('tile_polygon: ', tile_polygon)
@@ -328,7 +327,7 @@ class BatchGridGeoSampler(GridGeoSampler):
                     selected_bbox_polygon = boundingBox_2_Polygon(selected_bbox)
 
                     #TODO: qui potenzialmente scartare tutte le patch che non hanno edifici o strade
-                    if selected_bbox_polygon.intersects(tile_polygon):
+                    if selected_bbox_polygon.intersects(self.dataset.tile_aoi):
                         #print("selected_bbox_polygon", selected_bbox_polygon)
                         batch.append(selected_bbox) #TODO: controlla che succede se l'ultimo batch non è pieno
                     else:
@@ -385,8 +384,8 @@ class MyIntersectionRandomGeoSampler(RandomGeoSampler):
             tile_path1= hit.object[0]
             tile_path2= hit.object[1]
 
-            tile_polyg1 = path_2_tilePolygon(tile_path1)
-            tile_polyg2 = path_2_tilePolygon(tile_path2)
+            tile_polyg1 = path_2_tile_aoi(tile_path1)
+            tile_polyg2 = path_2_tile_aoi(tile_path2)
 
             bounds = BoundingBox(*hit.bounds) #TODO: ridurre i bounds usando il bbox del geojson
             # Choose a random index within that tile
@@ -431,8 +430,8 @@ class MyIntersectionGridGeoSampler(GridGeoSampler):
         for hit in self.hits:
             path_tile_1 = hit.object[0]
             path_tile_2 = hit.object[1]
-            polyg_tile_1 = path_2_tilePolygon(path_tile_1)
-            polyg_tile_2=  path_2_tilePolygon(path_tile_2)
+            polyg_tile_1 = path_2_tile_aoi(path_tile_1)
+            polyg_tile_2=  path_2_tile_aoi(path_tile_2)
 
             print('In sampler')
             print('tile_polygon 1: ', polyg_tile_1)
