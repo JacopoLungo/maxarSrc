@@ -217,6 +217,44 @@ def write_canvas_geo(canvas: np.array,
             canvas[I] = patch_mask[:, :max_idxs[0], :max_idxs[1]]
 
     return canvas 
+
+
+def write_canvas_geo_window(canvas: np.array,
+                            weights: np.array,
+                    patch_masks_b: np.array,
+                    top_lft_indexes: List) -> np.array:
+    """
+    Write the patch masks in the canvas.
+
+    Args:
+        canvas (np.array): The canvas to write the patch masks on. It should have shape (channel, h_tile, w_tile).
+        weights (np.array): The canvas that contains the weights used to weight the contribution of each patch. It should have shape (channel, h_tile, w_tile).
+        patch_masks_b (np.array): The patch masks to be written on the canvas. It should have shape (b, channel, h_patch, w_patch).
+        top_lft_indexes (List): The top left indexes of each patch mask in the canvas.
+        smooth (bool): If True, it expects patch_mask to have logits, otherwise it should contain bools.
+
+    Returns:
+        np.array: The updated canvas with the patch masks written on it.
+    """
+    # initialize the window, a 2d array containing a cosine window, of the same size as the patch
+    window = np.outer(np.hanning(patch_masks_b.shape[-1]), np.hanning(patch_masks_b.shape[-1]))
+    
+    size = patch_masks_b.shape[-1]
+    for patch_mask, top_left_index in zip(patch_masks_b, top_lft_indexes):
+        I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
+        I_weight = np.s_[top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
+        #max_idxs is useful when reached the border of the canva, it contains the height and width that you can write on the canva
+        max_idxs = canvas[I].shape[1:]
+        
+        #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
+        #print('patch', patch_mask[:, :max_idxs[0], :max_idxs[1]].shape)
+        canvas[I] = canvas[I] + patch_mask[:, :max_idxs[0], :max_idxs[1]] * window[:max_idxs[0], :max_idxs[1]]
+        weights[I_weight] = weights[I_weight] + window[:max_idxs[0], :max_idxs[1]]
+
+    return canvas, weights
+
+
+
     
 def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
     """

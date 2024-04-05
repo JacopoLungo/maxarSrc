@@ -359,7 +359,8 @@ class Mosaic:
                                                stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
-        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
         
         Esam_total = 0
         post_proc_total = 0
@@ -411,10 +412,17 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                           weights = weights,
                                                     patch_masks_b =  patch_masks_b,
                                                     top_lft_indexes = batch['top_lft_index'],
-                                                    smooth=seg_config.smooth_patch_overlap)
+                                                    )
+
+            # old version
+            # canvas = segment_utils.write_canvas_geo(canvas= canvas,
+            #                                         patch_masks_b =  patch_masks_b,
+            #                                         top_lft_indexes = batch['top_lft_index'],
+            #                                         smooth = False)
 
             post_proc_total += time() - post_proc_start
                 
@@ -425,7 +433,9 @@ class Mosaic:
             #if True and batch_ix == 25:
             #    break
         
-        canvas = np.greater_equal(canvas, 0) #turn logits into bool
+        # divide by the weights to get the average
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        canvas = np.greater(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
 
@@ -446,7 +456,8 @@ class Mosaic:
         sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
-        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
 
         #all_batches_img_ixs = np.arange(len(sampler)*seg_config.batch_size).reshape((-1, seg_config.batch_size))
         #_, total_cols = sampler.get_num_rows_cols()
@@ -516,10 +527,17 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                    weights = weights,
                                                     patch_masks_b =  patch_masks_b,
-                                                    top_lft_indexes = batch['top_lft_index'],
-                                                    smooth=seg_config.smooth_patch_overlap)
+                                                    top_lft_indexes = batch['top_lft_index'],)
+             
+            # old version
+            # canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            #                                         patch_masks_b =  patch_masks_b,
+            #                                         img_ixs = batch_ix,
+            #                                         stride = seg_config.stride)
+            
 
             post_proc_total += time() - post_proc_start
                 
@@ -532,8 +550,10 @@ class Mosaic:
                 
             # if batch_ix == 50:
             #     break
-            
-        canvas = np.greater_equal(canvas, 0) #turn logits into bool
+        
+        # divide by the weights to get the average
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        canvas = np.greater(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
     
