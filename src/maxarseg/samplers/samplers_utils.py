@@ -7,6 +7,7 @@ import numpy as np
 import geopandas as gpd
 from maxarseg.geo_datasets import geoDatasets
 from shapely.geometry.polygon import Polygon
+from typing import Optional
 
 #from maxarseg import segment
 
@@ -80,7 +81,7 @@ def align_bbox(bbox: Polygon):
 def rel_bbox_coords(geodf:gpd.GeoDataFrame,
                     ref_coords:tuple,
                     res,
-                    ext_mt = None):
+                    ext_mt: int = 0):
     """
     Returns the relative coordinates of a bbox w.r.t. a reference bbox in the 'geometry' column.
     Goes from absolute geo coords to relative coords in the image.

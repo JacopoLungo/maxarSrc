@@ -269,3 +269,4 @@ yapf==0.40.2
 yarg==0.1.9
 yarl==1.9.4
 zipp==3.18.1
+git+https://github.com/mit-han-lab/efficientvit.git

@@ -28,7 +28,7 @@ def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img
     return np.array(input_pts), np.array(input_lbs) # (batch_size, max_queries, 2, 2), (batch_size, max_queries, 2)
 
 
-def discern(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.array):
+def discern(all_mask_b: np.ndarray, num_trees4img:np.ndarray, num_build4img: np.ndarray):
     """
     Discern the masks of the trees, buildings and padding from the all_mask_b array
     Inputs:
@@ -59,7 +59,7 @@ def discern(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.arra
     
     return tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:] #all (b, h, w), slice out the first element
 
-def discern_mode(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.array, mode: str = 'bchw'):
+def discern_mode(all_mask_b: np.ndarray, num_trees4img:np.ndarray, num_build4img: np.ndarray, mode: str = 'bchw'):
     """
     Discern the masks of the trees, buildings and padding from the all_mask_b array
     Inputs:
@@ -95,7 +95,7 @@ def discern_mode(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np
         out = np.stack((tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:]), axis=0) # (c, b, h, w) , slice out the first element of dim 1
     return out
 
-def discern_mode_smooth(all_mask_b: np.array, num_trees4img:np.array, num_build4img: np.array, mode: str = 'bchw'):
+def discern_mode_smooth(all_mask_b: np.ndarray, num_trees4img:np.ndarray, num_build4img: np.ndarray, mode: str = 'bchw'):
     """
     Discern the masks of the trees, buildings and padding from the all_mask_b array
     Inputs:
@@ -127,7 +127,7 @@ def discern_mode_smooth(all_mask_b: np.array, num_trees4img:np.array, num_build4
         out = np.stack((tree_mask_b[1:], build_mask_b[1:], pad_mask_b[1:]), axis=0) # (c, b, h, w) , slice out the first element of dim 1
     return out
 
-def rmv_mask_b_overlap(overlapping_masks_b: np.array): #(b, c, h, w)
+def rmv_mask_b_overlap(overlapping_masks_b: np.ndarray): #(b, c, h, w)
     """
     Remove overlapping between the masks. Giving priority according to the inverse of the order of
     the masks.
@@ -142,7 +142,7 @@ def rmv_mask_b_overlap(overlapping_masks_b: np.array): #(b, c, h, w)
     return disjoined_masks_b
 
 #Use the batch version of this function
-def rmv_mask_overlap(overlapping_masks: np.array):
+def rmv_mask_overlap(overlapping_masks: np.ndarray):
     """
     Remove overlapping between the masks. Giving priority according to the inverse of the order of
     the masks.
@@ -159,11 +159,11 @@ def rmv_mask_overlap(overlapping_masks: np.array):
 
     return no_overlap_masks
 
-def write_canvas(canvas: np.array,
-                 patch_masks_b: np.array,
-                 img_ixs: np.array,
+def write_canvas(canvas: np.ndarray,
+                 patch_masks_b: np.ndarray,
+                 img_ixs: np.ndarray,
                  stride: int,
-                 total_cols: int) -> np.array:
+                 total_cols: int) -> np.ndarray:
     """
     Write the patch masks in the canvas
     Inputs:
@@ -185,10 +185,10 @@ def write_canvas(canvas: np.array,
 
     return canvas
 
-def write_canvas_geo(canvas: np.array,
-                    patch_masks_b: np.array,
+def write_canvas_geo(canvas: np.ndarray,
+                    patch_masks_b: np.ndarray,
                     top_lft_indexes: List,
-                    smooth: bool) -> np.array:
+                    smooth: bool) -> np.ndarray:
     """
     Write the patch masks in the canvas.
 
@@ -219,7 +219,7 @@ def write_canvas_geo(canvas: np.array,
 
     return canvas 
 
-def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
+def clean_masks(masks: np.ndarray, area_threshold = 80, min_size = 80) -> np.ndarray:
     """
     Cleans the input masks by removing small holes and objects.
 
