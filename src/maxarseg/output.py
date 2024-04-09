@@ -29,7 +29,7 @@ def single_mask2Tif(tile_path, mask, out_name, out_dir_root = './output/tiff'):
     
     print(f"Mask written in {out_path}")
     
-def masks2Tifs(tile_path: str, masks: np.ndarray, out_names: list, separate_masks: bool, out_dir_root='./output/tiff'):
+def masks2Tifs(tile_path , masks: np.ndarray, out_names: list, separate_masks: bool, out_dir_root = './output/tiff'):
     if not separate_masks: #merge the masks
         mask = segment_utils.merge_masks(masks)
         masks = np.expand_dims(mask, axis=0)

@@ -1,6 +1,8 @@
 import numpy as np
 from typing import List, Tuple, Union
 from skimage import morphology
+from shapely.geometry import Polygon
+
 
 def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img_x, 4)
                           building_boxes_b: List, 
@@ -157,7 +159,6 @@ def rmv_mask_overlap(overlapping_masks: np.array):
 
     return no_overlap_masks
 
-
 def write_canvas(canvas: np.array,
                  patch_masks_b: np.array,
                  img_ixs: np.array,
@@ -219,10 +220,10 @@ def write_canvas_geo(canvas: np.array,
     return canvas 
 
 
-def write_canvas_geo_window(canvas: np.array,
-                            weights: np.array,
-                    patch_masks_b: np.array,
-                    top_lft_indexes: List) -> np.array:
+def write_canvas_geo_window(canvas: np.ndarray,
+                            weights: np.ndarray,
+                    patch_masks_b: np.ndarray,
+                    top_lft_indexes: List) -> np.ndarray:
     """
     Write the patch masks in the canvas.
 
@@ -256,7 +257,7 @@ def write_canvas_geo_window(canvas: np.array,
 
 
     
-def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
+def clean_masks(masks: np.ndarray, area_threshold = 80, min_size = 80) -> np.ndarray:
     """
     Cleans the input masks by removing small holes and objects.
 
@@ -271,7 +272,7 @@ def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array
     single_mask = False
     if len(masks.shape) == 2:
         single_mask = True
-        masks = np.expand_dims(mask, axis=0)
+        masks = np.expand_dims(masks, axis=0)
     
     clear_masks = []
     masks_int = masks.astype(np.uint8)
@@ -309,5 +310,3 @@ def merge_masks(masks: np.ndarray):
         merged_mask[mask.astype(bool)] = i
 
     return merged_mask
-
-

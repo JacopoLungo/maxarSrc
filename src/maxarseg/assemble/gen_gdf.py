@@ -5,7 +5,7 @@ from pyquadkey2 import quadkey
 import pandas as pd
 from shapely import geometry
 import json
-
+from maxarseg import assemble
 
 def intersecting_qks(bott_left_lon_lat: tuple, top_right_lon_lat: tuple, min_level=7, max_level=9):
     """
@@ -48,8 +48,9 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
 
     if not quiet:
         print(f"\nBuildings: found {len(country_links)} links matching: {qk_list}")
+
     if len(country_links) == 0:
-        print("No buildings for this region")
+        print("MS-Buildings: No buildings for this region")
         return gpd.GeoDataFrame()
     gdfs = []
     for _, row in country_links.iterrows():
@@ -59,10 +60,29 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
         gdfs.append(gdf_down)
 
     gdfs = pd.concat(gdfs)
-    if dataset_crs is not None: #se inserito il crs del dataset, lo converto
+    if dataset_crs is not None: #if the crs is passed, convert the coordinates
         gdfs = gdfs.to_crs(dataset_crs)
     return gdfs
 
+def google_building_gdf(event_name, bbox):
+    """
+    Generate a GeoDataFrame containing Google building data filtered by a bounding box.
+
+    Args:
+    - event_name (str): The name of the event.
+    - bbox (tuple): A tuple representing the bounding box coordinates in the format (minx, miny, maxx, maxy).
+
+    Returns:
+    - gdf_filtered (GeoDataFrame): A GeoDataFrame containing the filtered Google building data.
+    """ 
+    root = '/nfs/projects/overwatch/maxar-segmentation/google-open-buildings'
+    f_name = 'open_buildings_v3_'+ event_name + '.csv'
+    file_path = Path(root) / f_name
+    df = pd.read_csv(file_path) #TODO: leggere solo le colonne necessarie e filtrare magari su confidence boxes
+    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs=4326)
+    gdf_filtered = assemble.filter.filter_gdf_w_bbox(gdf, bbox)
+    return gdf_filtered
+    
 def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/maxar-segmentation/microsoft-roads'):
     #TODO: cercare di velocizzare la lettura dei dati delle strade
     """

@@ -13,34 +13,34 @@ class SegmentConfig:
     It contains detection and segmentation parameters as well as the models themselves. 
     """
     def __init__(self,
-                 batch_size,
-                 size = 600,
-                 stride = 400,
-                 
-                 device = 'cuda',
-                 GD_root = "./models/GDINO",
-                 GD_config_file = "GroundingDINO_SwinT_OGC.py",
-                 GD_weights = "groundingdino_swint_ogc.pth",
-                 
-                 TEXT_PROMPT = 'bush', #'green tree'
-                 BOX_THRESHOLD = 0.15,
-                 TEXT_THRESHOLD = 0.30,
-                 
-                 max_area_GD_boxes_mt2 = 6000,
-                 min_ratio_GD_boxes_edges = 0,
-                 perc_reduce_tree_boxes = 0,
-                 
-                 road_width_mt = 5,
-                 ext_mt_build_box = 0,
-                 
-                 ESAM_root = './models/EfficientSAM',
-                 ESAM_num_parall_queries = 5,
-                 smooth_patch_overlap = False, #if this is false, stride could be equal to size
-                 use_separate_detect_config = False,
-                 
-                 clean_masks_bool = False,
-                 rmv_holes_area_th = 80,
-                 rmv_small_obj_area_th = 80):
+                batch_size,
+                size = 600,
+                stride = 400,
+                
+                device = 'cuda',
+                GD_root = "./models/GDINO",
+                GD_config_file = "GroundingDINO_SwinT_OGC.py",
+                GD_weights = "groundingdino_swint_ogc.pth",
+                
+                TEXT_PROMPT = 'bush', #'green tree'
+                BOX_THRESHOLD = 0.15,
+                TEXT_THRESHOLD = 0.30,
+                
+                max_area_GD_boxes_mt2 = 6000,
+                min_ratio_GD_boxes_edges = 0,
+                perc_reduce_tree_boxes = 0,
+                
+                road_width_mt = 5,
+                ext_mt_build_box = 0,
+                
+                ESAM_root = './models/EfficientSAM',
+                ESAM_num_parall_queries = 5,
+                smooth_patch_overlap = False, #if this is false, stride could be equal to size
+                use_separate_detect_config = False,
+                
+                clean_masks_bool = False,
+                rmv_holes_area_th = 80,
+                rmv_small_obj_area_th = 80):
         
         #General
         self.batch_size = batch_size
@@ -87,35 +87,36 @@ class SegmentConfig:
 class DetectConfig:
 
     def __init__(self,
-                 batch_size = 1,
-                 size = 600,
-                 stride = 400,
-                 
-                 device = 'cuda',
-                 GD_root = "./models/GDINO",
-                 GD_config_file = "GroundingDINO_SwinT_OGC.py",
-                 GD_weights = "groundingdino_swint_ogc.pth",
-                 
-                 TEXT_PROMPT = 'bush', #'green tree'
-                 BOX_THRESHOLD = 0.15,
-                 TEXT_THRESHOLD = 0.30,
-                 
-                 DF_patch_size = 400,
-                 DF_patch_overlap = 0.25,
-                 DF_box_threshold = 0.1,
-                 
-                 max_area_GD_boxes_mt2 = 6000,
-                 min_ratio_GD_boxes_edges = 0,
-                 perc_reduce_tree_boxes = 0,
-                 nms_threshold = 0.5):
+                size = 600,
+                stride = 400,                
+                device = 'cuda',
+                
+                GD_batch_size = 1,
+                GD_root = "./models/GDINO",
+                GD_config_file = "GroundingDINO_SwinT_OGC.py",
+                GD_weights = "groundingdino_swint_ogc.pth",
+                
+                TEXT_PROMPT = 'bush', #'green tree'
+                BOX_THRESHOLD = 0.15,
+                TEXT_THRESHOLD = 0.30,
+                
+                DF_patch_size = 400,
+                DF_patch_overlap = 0.25,
+                DF_box_threshold = 0.1,
+                DF_batch_size = 1,
+                
+                max_area_GD_boxes_mt2 = 6000,
+                min_ratio_GD_boxes_edges = 0.0,
+                perc_reduce_tree_boxes = 0.0,
+                nms_threshold = 0.5):
         
         #General
-        self.batch_size = batch_size
         self.size = size
         self.stride = stride # Overlap between each patch = (size - stride)
         self.device = device
         
         #Grounding Dino (Trees)
+        self.GD_batch_size = GD_batch_size
         self.GD_root = Path(GD_root)
         self.CONFIG_PATH = self.GD_root / GD_config_file
         self.WEIGHTS_PATH = self.GD_root / GD_weights
@@ -130,6 +131,7 @@ class DetectConfig:
         self.DF_patch_overlap = DF_patch_overlap
         self.DF_box_threshold = DF_box_threshold
         self.DF_device = [int(device.split(':')[-1])] if len(device.split(':')) > 1 else 'auto' #Remove the port number from the device (e.g. 'cuda:0' -> 'cuda'
+        self.DF_batch_size = DF_batch_size
         
         #Filtering
         self.max_area_GD_boxes_mt2 = max_area_GD_boxes_mt2

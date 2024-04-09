@@ -18,7 +18,6 @@ from maxarseg.segment import segment
 import torch
 import rasterio
 from rasterio.features import rasterize
-from maxarseg.samplers_utils import path_2_tilePolygon
 
 ###########################
 # Retrieve bbox coordinates 
