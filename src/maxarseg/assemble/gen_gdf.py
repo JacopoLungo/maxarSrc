@@ -50,7 +50,7 @@ def qk_building_gdf(qk_list, csv_path = 'metadata/buildings_dataset_links.csv', 
         print(f"\nBuildings: found {len(country_links)} links matching: {qk_list}")
 
     if len(country_links) == 0:
-        print("No buildings for this region")
+        print("MS-Buildings: No buildings for this region")
         return gpd.GeoDataFrame()
     gdfs = []
     for _, row in country_links.iterrows():

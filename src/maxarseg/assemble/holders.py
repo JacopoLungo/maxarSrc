@@ -1,7 +1,8 @@
 #Generic
 from pathlib import Path
 from tqdm import tqdm
-from time import time
+
+from time import time, perf_counter
 import numpy as np
 import rasterio
 from rasterio.features import rasterize
@@ -43,6 +44,7 @@ from efficientvit.models.efficientvit.sam import EfficientViTSamPredictor
 # Ignore all warnings
 warnings.filterwarnings('ignore')
 
+
 class Mosaic:
     def __init__(self,
                 name,
@@ -83,14 +85,17 @@ class Mosaic:
         self.road_num = len(self.road_gdf)
         print(f'Roads in {self.name} mosaic: {self.road_num}')
     
-    def set_build_gdf(self):
+    def set_build_gdf(self): # FIXME: if no buildings are found, self.build_gdf is None and the program crashes during segmentation
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
 
         if len(self.build_gdf) == 0: #here use google buildings
             self.build_gdf = gen_gdf.google_building_gdf(event_name=self.event.name, bbox=self.bbox)
             if len(self.build_gdf) == 0:
-                raise Exception('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                self.build_gdf = None
+                self.proj_build_gdf = None
+                print('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                return False
                 
         self.proj_build_gdf = self.build_gdf.to_crs(self.crs)
         
@@ -154,7 +159,7 @@ class Mosaic:
         glb_tile_tree_boxes = torch.empty(0, 4)
         all_logits = torch.empty(0)
         
-        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees"):
+        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees with GDino"):
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
             
             for img, img_top_left_index in zip(img_b, batch['top_lft_index']):
@@ -375,7 +380,8 @@ class Mosaic:
                                             stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
-        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
         
         Esam_total = 0
         post_proc_total = 0
@@ -427,10 +433,17 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                           weights = weights,
                                                     patch_masks_b =  patch_masks_b,
                                                     top_lft_indexes = batch['top_lft_index'],
-                                                    smooth=seg_config.smooth_patch_overlap)
+                                                    )
+
+            # old version
+            # canvas = segment_utils.write_canvas_geo(canvas= canvas,
+            #                                         patch_masks_b =  patch_masks_b,
+            #                                         top_lft_indexes = batch['top_lft_index'],
+            #                                         smooth = False)
 
             post_proc_total += time() - post_proc_start
                 
@@ -438,14 +451,13 @@ class Mosaic:
                 print('Avg times (sec/batch)')
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 
-            #if True and batch_ix == 25:
+            #if True and batch_ix == 50:
             #    break
         
-        canvas = np.greater_equal(canvas, 0) #turn logits into bool
-                
-        #bool np.array False outside the aoi
+        # divide by the weights to get the average
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
-
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
     
@@ -466,7 +478,8 @@ class Mosaic:
         sampler = samplers.BatchGridGeoSampler(dataset, batch_size=seg_config.batch_size, size=seg_config.size, stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
 
-        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float('-inf') ,dtype=np.float32) #dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        canvas = np.full((3,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
 
         #all_batches_img_ixs = np.arange(len(sampler)*seg_config.batch_size).reshape((-1, seg_config.batch_size))
         #_, total_cols = sampler.get_num_rows_cols()
@@ -536,10 +549,17 @@ class Mosaic:
             #se smooth = False le logits vengono trasformate in bool in discern_mode e quindi write_canvas si aspetta le bool
             #se smooth = True le logits vengono scritti direttamente in canvas e devi trasformarle in bool dopo
             
-            canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                    weights = weights,
                                                     patch_masks_b =  patch_masks_b,
-                                                    top_lft_indexes = batch['top_lft_index'],
-                                                    smooth=seg_config.smooth_patch_overlap)
+                                                    top_lft_indexes = batch['top_lft_index'],)
+             
+            # old version
+            # canvas = segment_utils.write_canvas_geo(canvas = canvas,
+            #                                         patch_masks_b =  patch_masks_b,
+            #                                         img_ixs = batch_ix,
+            #                                         stride = seg_config.stride)
+            
 
             post_proc_total += time() - post_proc_start
                 
@@ -550,10 +570,12 @@ class Mosaic:
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 print(f'- post_proc: {(post_proc_total/(batch_ix + 1)):.4f}')
                 
-            if batch_ix == 50:
-                break
-            
-        canvas = np.greater_equal(canvas, 0) #turn logits into bool
+            # if batch_ix == 50:
+            #     break
+        
+        # divide by the weights to get the average
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        canvas = np.greater(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
 
@@ -658,7 +680,10 @@ class Mosaic:
         seg_config = self.event.seg_config
         
         if self.build_gdf is None:
-            self.set_build_gdf()
+            response = self.set_build_gdf()
+            if response == False:
+                return False
+            
         if self.road_gdf is None:
             self.set_road_gdf()
         
@@ -693,10 +718,20 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
+        return True
         
-    def segment_all_tiles(self, out_dir_root):
+    def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
-            self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True) 
+            start_time = perf_counter()
+            response = self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True, separate_masks=False)
+            end_time = perf_counter() 
+            execution_time = end_time - start_time 
+            time_per_tile.append(execution_time)
+            print(f'Finished segmenting tile {tile_path} in {execution_time:.2f} seconds')
+            print(f'Average time per tile: {np.mean(time_per_tile):.2f} seconds')
+            if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
+                return time_per_tile, False
+        return time_per_tile, True
 
 
 class Event:
@@ -711,6 +746,7 @@ class Event:
         #Configs
         self.seg_config = seg_config
         self.det_config = det_config
+        self.time_per_tile = []
         
         #Paths
         self.maxar_root = Path(maxar_root)
@@ -785,7 +821,11 @@ class Event:
     #Segment methods
     def seg_all_mosaics(self, out_dir_root):
         for __, mosaic in self.mosaics.items():
-            mosaic.segment_all_tiles(out_dir_root=out_dir_root)
+            times, response = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
+            self.time_per_tile.extend(times)
+            if response == False:
+                print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
+                continue  
 
     def load_evit_and_predictor(self): #TODO fare tutti i metodi per caricare e scaricare modelli
         self.wteSAM = create_sam_model(name="xl1", weight_url="efficientvit/assets/checkpoints/sam/xl1.pt")

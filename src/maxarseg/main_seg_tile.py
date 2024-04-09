@@ -1,19 +1,7 @@
 import argparse
-import glob
-import rasterio
-from pathlib import Path
-import os
-import reverse_geocoder as rg
-import pyproj
-import geopandas as gpd
-import sys
-
-if Path.cwd().name != 'src':
-    os.chdir('./src')
 
 from maxarseg.assemble import names
 from maxarseg.assemble import holders
-
 from maxarseg.configs import SegmentConfig
 
 def main(): 
