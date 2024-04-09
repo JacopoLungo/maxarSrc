@@ -293,6 +293,7 @@ class BatchGridGeoSampler(GridGeoSampler):
 
         super().__init__(dataset, size, stride, roi, units)
         self.batch_size = batch_size
+        self.dataset = dataset
     
     def __iter__(self) -> Iterator[BoundingBox]:
         """Return the index of a dataset.
@@ -354,7 +355,7 @@ class BatchGridGeoSampler(GridGeoSampler):
             number of batches in an epoch
         """
         return math.ceil(self.length / self.batch_size)
- 
+
 
 # Samplers per Intersection Datasets
 class MyIntersectionRandomGeoSampler(RandomGeoSampler):

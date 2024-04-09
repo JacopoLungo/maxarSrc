@@ -37,6 +37,7 @@ from deepforest import main
 # Ignore all warnings
 warnings.filterwarnings('ignore')
 
+
 class Mosaic:
     def __init__(self,
                  name,
@@ -84,11 +85,14 @@ class Mosaic:
         if len(self.build_gdf) == 0: #here use google buildings
             self.build_gdf = gen_gdf.google_building_gdf(event_name=self.event.name, bbox=self.bbox)
             if len(self.build_gdf) == 0:
-                raise Exception('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                self.build_gdf = None
+                self.proj_build_gdf = None
+                print('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                return False
                 
         self.proj_build_gdf = self.build_gdf.to_crs(self.crs)
         
-    def seg_road_tile(self, tile_path) -> np.array:
+    def seg_road_tile(self, tile_path) -> np.ndarray:
         seg_config = self.event.seg_config
         with rasterio.open(tile_path) as src:
             transform = src.transform
@@ -148,7 +152,7 @@ class Mosaic:
         glb_tile_tree_boxes = torch.empty(0, 4)
         all_logits = torch.empty(0)
         
-        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees"):
+        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees with GDino"):
             img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
             
             for img, img_top_left_index in zip(img_b, batch['top_lft_index']):
@@ -432,7 +436,7 @@ class Mosaic:
                 print('Avg times (sec/batch)')
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 
-            #if True and batch_ix == 25:
+            #if True and batch_ix == 50:
             #    break
         
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
@@ -544,8 +548,8 @@ class Mosaic:
                 print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
                 print(f'- post_proc: {(post_proc_total/(batch_ix + 1)):.4f}')
                 
-            if batch_ix == 50:
-                break
+            #if batch_ix == 50:
+            #    break
             
         canvas = np.greater_equal(canvas, 0) #turn logits into bool
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
@@ -656,7 +660,10 @@ class Mosaic:
         seg_config = self.event.seg_config
         
         if self.build_gdf is None:
-            self.set_build_gdf()
+            response = self.set_build_gdf()
+            if response == False:
+                return False
+            
         if self.road_gdf is None:
             self.set_road_gdf()
         
@@ -691,11 +698,15 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
+        return True
         
     def segment_all_tiles(self, out_dir_root):
         for tile_path in self.tiles_paths:
-            self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True) 
-
+            response = self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True, separate_masks = False)
+            if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
+                return False
+        return True #if all tile in the mosaics are correctly segmented
+                
 
 class Event:
     def __init__(self,
@@ -774,4 +785,7 @@ class Event:
     #Segment methods
     def seg_all_mosaics(self, out_dir_root):
         for __, mosaic in self.mosaics.items():
-            mosaic.segment_all_tiles(out_dir_root=out_dir_root)
+            response = mosaic.segment_all_tiles(out_dir_root=out_dir_root)
+            if response == False:
+                print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
+                continue

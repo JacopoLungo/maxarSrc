@@ -219,7 +219,7 @@ def write_canvas_geo(canvas: np.array,
 
     return canvas 
 
-def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array:
+def clean_masks(masks: np.ndarray, area_threshold = 80, min_size = 80) -> np.ndarray:
     """
     Cleans the input masks by removing small holes and objects.
 
@@ -234,11 +234,11 @@ def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array
     single_mask = False
     if len(masks.shape) == 2:
         single_mask = True
-        masks = np.expand_dims(mask, axis=0)
+        masks = np.expand_dims(masks, axis=0)
     
     clear_masks = []
-    
-    for mask in masks:
+    masks_int = masks.astype(int)
+    for mask in masks_int:
             clear_mask = morphology.remove_small_holes(mask, area_threshold = area_threshold)
             clear_mask = morphology.remove_small_objects(clear_mask, min_size = min_size)
             
