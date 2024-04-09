@@ -39,6 +39,10 @@ def GD_img_load(np_img_rgb: np.array)-> torch.Tensor:
         ]
     )
     image_pillow = Image.fromarray(np_img_rgb)
+    # try:
+    #     image_pillow = Image.fromarray(np_img_rgb)
+    # except:
+    #     print("Error in Image.fromarray")
     image_transformed, _ = transform(image_pillow, None)
     return image_transformed
 

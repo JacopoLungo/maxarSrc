@@ -77,7 +77,7 @@ class Mosaic:
         self.road_num = len(self.road_gdf)
         print(f'Roads in {self.name} mosaic: {self.road_num}')
     
-    def set_build_gdf(self):
+    def set_build_gdf(self): # FIXME: if no buildings are found, self.build_gdf is None and the program crashes during segmentation
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
         self.build_num = len(self.build_gdf)

@@ -274,16 +274,14 @@ def clean_masks(masks: np.array, area_threshold = 80, min_size = 80) -> np.array
         masks = np.expand_dims(mask, axis=0)
     
     clear_masks = []
-    
-    for mask in masks:
-            clear_mask = morphology.remove_small_holes(mask, area_threshold = area_threshold)
-            clear_mask = morphology.remove_small_objects(clear_mask, min_size = min_size)
-            
-            #clear_mask = morphology.binary_opening(mask)
-            #clear_mask = morphology.binary_closing(clear_mask)
+    masks_int = masks.astype(np.uint8)
+    for mask in masks_int:
+        clear_mask = morphology.remove_small_holes(mask, area_threshold = area_threshold)
+        clear_mask = morphology.remove_small_objects(clear_mask, min_size = min_size)
+        #clear_mask = morphology.binary_opening(mask)
+        #clear_mask = morphology.binary_closing(clear_mask)
+        clear_masks.append(clear_mask)
 
-            clear_masks.append(clear_mask)
-            
     if single_mask:
         clear_masks = clear_masks[0]
     else:

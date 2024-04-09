@@ -109,7 +109,11 @@ def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, d
     num_boxes4img = []
     for bbox in batch_bbox:
         query_patch_poly = samplers_utils.boundingBox_2_Polygon(bbox) #from patch bbox to polygon
-        gdf_index = proj_gdf.sindex #get spatial index
+        gdf_index = proj_gdf.sindex
+        # try:
+        #     gdf_index = proj_gdf.sindex #get spatial index
+        # except:
+        #     print("Error: gdf does not have spatial index")
         hits = gdf_index.query(query_patch_poly) #query index
         
         num_boxes4img.append(len(hits)) #append number of boxes
