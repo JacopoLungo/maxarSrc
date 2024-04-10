@@ -73,7 +73,6 @@ def discern_mode(all_mask_b: np.ndarray, num_trees4img:np.ndarray, num_build4img
     """
     h, w = all_mask_b.shape[2:]
     tree_mask_b = build_mask_b = pad_mask_b = np.full((1, h, w), False)
-
     all_mask_b = np.greater_equal(all_mask_b, 0) #from logits to bool
     
     
@@ -117,7 +116,7 @@ def discern_mode_smooth(all_mask_b: np.ndarray, num_trees4img:np.ndarray, num_bu
 
         build_mask = all_mask[tree_ix : (tree_ix + build_ix)].max(axis=0, initial = float('-inf')) # Squash the build masks. Get shape (h, w)
         build_mask_b = np.concatenate((build_mask_b, build_mask[None, ...]), axis=0)
-         
+        
         pad_mask = all_mask[(tree_ix + build_ix) : ].max(axis=0, initial = float('-inf'))
         pad_mask_b = np.concatenate((pad_mask_b, pad_mask[None, ...]), axis=0)
     
@@ -222,8 +221,9 @@ def write_canvas_geo(canvas: np.ndarray,
 
 def write_canvas_geo_window(canvas: np.ndarray,
                             weights: np.ndarray,
-                    patch_masks_b: np.ndarray,
-                    top_lft_indexes: List) -> np.ndarray:
+                            patch_masks_b: np.ndarray,
+                            top_lft_indexes: List) -> Tuple[np.ndarray, np.ndarray]:
+                            
     """
     Write the patch masks in the canvas.
 
@@ -247,8 +247,6 @@ def write_canvas_geo_window(canvas: np.ndarray,
         #max_idxs is useful when reached the border of the canva, it contains the height and width that you can write on the canva
         max_idxs = canvas[I].shape[1:]
         
-        #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
-        #print('patch', patch_mask[:, :max_idxs[0], :max_idxs[1]].shape)
         canvas[I] = canvas[I] + patch_mask[:, :max_idxs[0], :max_idxs[1]] * window[:max_idxs[0], :max_idxs[1]]
         weights[I_weight] = weights[I_weight] + window[:max_idxs[0], :max_idxs[1]]
 

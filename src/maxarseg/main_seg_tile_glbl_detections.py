@@ -36,10 +36,11 @@ def main():
     parser.add_argument('--perc_reduce_tree_boxes', default = 0, type = float, help = 'Percentage of reduction of the tree boxes')
     
     #Segment config
+    parser.add_argument('--use_evit', action='store_true', help='Use evit for the segmentation')
     parser.add_argument('--bs_seg', default = 2, type = int, help = 'Batch size for the segmentation')
     parser.add_argument('--device_seg', default = 'cuda:0', help='device to use')
     
-    parser.add_argument('--size_seg', default = 600, type = int, help = 'Size of the patch')
+    parser.add_argument('--size_seg', default = 600, type = int, help = 'Size of the patch') #TODO: se viene usato evit allora questo parametro viene disattivato
     parser.add_argument('--stride_seg', default = 400, type = int, help = 'Stride of the patch')
     
     parser.add_argument('--ext_mt_build_box', default = 0, type = int, help = 'Extra meter to enlarge building boxes')
@@ -76,7 +77,7 @@ def main():
                             )
     
     seg_config = SegmentConfig(batch_size = args.bs_seg,
-                                size = args.size_seg,
+                                size = 1024 if args.use_evit else args.size_seg, #TODO: delete hardcoded 1024, make it variable to the model used
                                 stride = args.stride_seg,
                                 device = args.device_seg,
                                 road_width_mt=args.road_width_mt,
@@ -84,7 +85,8 @@ def main():
                                 ESAM_root = args.ESAM_root,
                                 ESAM_num_parall_queries = args.ESAM_num_parall_queries,
                                 use_separate_detect_config=True,
-                                clean_masks_bool= True
+                                clean_masks_bool= True,
+                                use_evit = args.use_evit
                                 )
     
     event = holders.Event(events_names[args.event_ix],

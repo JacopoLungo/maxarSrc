@@ -2,6 +2,8 @@ from pathlib import Path
 import pandas as pd
 import glob
 import os
+from typing import Union
+
 
 
 def get_region_name(event_name, metadata_root = './metadata'):
@@ -36,7 +38,7 @@ def get_all_events(data_root = '/nfs/projects/overwatch/maxar-segmentation/maxar
     return sorted(list(all_events))
 
 
-def get_mosaics_names(event_name, data_root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data', when = None):
+def get_mosaics_names(event_name, data_root: Union[str, Path] = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data', when = None):
     """
     Get all the mosaic names for an event.
     Input:

@@ -110,7 +110,7 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
     
     return result
 
-def tile_sizes(dataset: geoDatasets.MxrSingleTile):
+def tile_sizes(dataset: geoDatasets.MxrSingleTile) -> tuple:
     """
     Returns the sizes of the tile given the path
     It uses the 

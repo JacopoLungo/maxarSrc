@@ -37,6 +37,7 @@ class SegmentConfig:
                 ESAM_num_parall_queries = 5,
                 smooth_patch_overlap = False, #if this is false, stride could be equal to size
                 use_separate_detect_config = False,
+                use_evit = False, #TODO: propagmate this paramter to whole program
                 
                 clean_masks_bool = False,
                 rmv_holes_area_th = 80,
@@ -48,6 +49,7 @@ class SegmentConfig:
         self.stride = stride # Overlap between each patch = (size - stride)
         self.device = device
         self.smooth_patch_overlap = smooth_patch_overlap
+        self.use_evit = use_evit
         
         if not use_separate_detect_config: #if you are not using a separate detect_config then define here all the detection configuration
             #Grounding Dino (Trees)
@@ -64,8 +66,12 @@ class SegmentConfig:
             self.perc_reduce_tree_boxes = perc_reduce_tree_boxes
 
         #Efficient SAM
-        self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
-        self.ESAM_num_parall_queries = ESAM_num_parall_queries
+        if not use_evit:
+            self.efficient_sam = build_efficient_sam_vitt(os.path.join(ESAM_root, 'weights/efficient_sam_vitt.pt')).to(self.device)
+            self.ESAM_num_parall_queries = ESAM_num_parall_queries          
+            if not use_separate_detect_config:
+                print('\n- GD model device:', next(self.GD_model.parameters()).device)
+            print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
         
         #Roads
         self.road_width_mt = road_width_mt
@@ -78,9 +84,6 @@ class SegmentConfig:
         self.ski_rmv_holes_area_th = rmv_holes_area_th
         self.rmv_small_obj_area_th = rmv_small_obj_area_th
         
-        if not use_separate_detect_config:
-            print('\n- GD model device:', next(self.GD_model.parameters()).device)
-        print('- Efficient SAM device:', next(self.efficient_sam.parameters()).device)
     
     def __str__(self) -> str:
         return f'{self.TEXT_PROMPT = }\n{self.BOX_THRESHOLD = }\n{self.TEXT_THRESHOLD = }\n{self.max_area_GD_boxes_mt2 = }\n{self.min_ratio_GD_boxes_edges = }\n{self.perc_reduce_tree_boxes = }\n{self.road_width_mt = }\n{self.ext_mt_build_box = }'

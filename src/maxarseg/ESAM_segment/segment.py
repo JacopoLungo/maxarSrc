@@ -2,9 +2,9 @@ import numpy as np
 import torch
 
 
-def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
-                    input_points: torch.tensor, #b, max_queries, 2, 2
-                    input_labels: torch.tensor, #b, max_queries, 2
+def ESAM_from_inputs(original_img_tsr: torch.Tensor, #b, c, h, w
+                    input_points: torch.Tensor, #b, max_queries, 2, 2
+                    input_labels: torch.Tensor, #b, max_queries, 2
                     efficient_sam,
                     num_parall_queries: int = 50,
                     device = 'cpu',
@@ -33,7 +33,6 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
                                                                     input_w = input_w,
                                                                     output_h=input_h,
                                                                     output_w=input_w)
-            
             if i == 0:
                 #print('predicetd_logits:', predicted_logits.shape)
                 np_complete_masks = predicted_logits[:,:,0].cpu().detach().numpy()
