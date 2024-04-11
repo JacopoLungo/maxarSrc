@@ -159,3 +159,4 @@ outputs/
 .vscode/tasks.json
 
 .python-version
+*.pickle
