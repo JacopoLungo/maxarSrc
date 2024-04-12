@@ -12,11 +12,8 @@ from torch.utils.data import DataLoader
 from torchgeo.datasets import stack_samples
 import torchvision
 import geopandas as gpd
-import supervision as sv
 from typing import Tuple
 import matplotlib.pyplot as plt
-import os
-import sys
 
 #My functions
 from maxarseg.assemble import delimiters, filter, gen_gdf, names
@@ -711,11 +708,19 @@ class Mosaic:
                                                          area_threshold = seg_config.ski_rmv_holes_area_th,
                                                          min_size = seg_config.rmv_small_obj_area_th)
         
+        no_overlap_masks_copy = no_overlap_masks.copy()
+
         output.masks2Tifs(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
+        
+        output.masks2parquet(tile_path,
+                        no_overlap_masks,
+                        out_names = out_names,
+                        out_dir_root = out_dir_root)
+        
         return True
         
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):

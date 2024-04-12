@@ -2,6 +2,9 @@ import rasterio
 from pathlib import Path
 import numpy as np
 from maxarseg.ESAM_segment import segment_utils
+import pandas as pd
+from maxarseg.polygonize import polygonize_with_values
+import geopandas as gpd
 
 def single_mask2Tif(tile_path, mask, out_name, out_dir_root = './output/tiff'):
     """
@@ -69,3 +72,28 @@ def gen_names(tile_path, separate_masks=False):
         out_names = [Path(ev_name) / tl_when / mos_name / (tl_name.split('.')[0] + '.tif')]
     
     return out_names
+
+def masks2parquet(tile_path , masks: np.ndarray, out_names: list, out_dir_root = './output/tiff'):
+    with rasterio.open(tile_path) as src:
+        out_meta = src.meta.copy()
+        # convert no_overlap_masks to int
+    tolerances = [0.001, 0.001, 0.001]
+    no_overlap_masks_int = masks.astype(np.uint8)
+    # polygonization
+    with rasterio.open(tile_path) as src:
+        out_meta = src.meta.copy()
+    gdf_list = []
+    # cicling over the masks channels
+    for i in range(no_overlap_masks_int.shape[0]):
+        if no_overlap_masks_int[i].sum() != 0:
+            gdf = polygonize_with_values(no_overlap_masks_int[i], class_id=i, tolerance=tolerances[i], transform=out_meta['transform'], crs=out_meta['crs'], pixel_threshold=10)
+            gdf_list.append(gdf)
+    # create a single gdf
+    gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
+    # create gdf_first with the first row of gdf
+    assert out_names.__len__() == 1, "Only one output name is allowed for parquet file"
+    out_path = Path(out_dir_root) / out_names[0]
+    # replace '.tif' with '.parquet'
+    out_path = out_path.with_suffix('.parquet')
+    gdf.to_parquet(out_path)
+    return gdf

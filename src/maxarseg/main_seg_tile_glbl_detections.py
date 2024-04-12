@@ -5,6 +5,8 @@ from maxarseg.assemble import names
 from maxarseg.assemble import holders
 from maxarseg.configs import SegmentConfig, DetectConfig
 
+torch.set_float32_matmul_precision('medium')
+
 def main(): 
 
     events_names = names.get_all_events()
