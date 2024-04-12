@@ -74,7 +74,7 @@ def evit_from_input_maybe_fast(boxes: torch.Tensor,
     for y, i in enumerate(range(0, boxes.shape[0], num_parall_queries)):
         batch_boxes = boxes[i:i+num_parall_queries]
         #print('boxes_area: ', torch.sum((batch_boxes[:,2]-batch_boxes[:,0])*(batch_boxes[:,3]-batch_boxes[:,1])).item())
-        print('boxes[i:i+num_parall_queries].shape: ', batch_boxes.shape)
+        #print('boxes[i:i+num_parall_queries].shape: ', batch_boxes.shape)
         masks, quality, low_res_logits = evit_sam_predictor.predict_torch(boxes = boxes[i:i+num_parall_queries],
                                                                             multimask_output=multimask_output,
                                                                             return_logits=return_logits) # shape: (n_boxes, n_masks, h_patch, w_patch)
@@ -113,36 +113,32 @@ def evit_from_input_x_boxes_cpu(boxes: torch.Tensor, num_tree_boxes: int,
     all_masks_np = np.empty((0, *original_img_h_w), dtype=np.float32)
     
     #masks_on_gpu = 0
-    threshold_to_cpu = 200 #TODO: aggingere come parametro
+    threshold_to_cpu = 400 #TODO: aggingere come parametro
     for i in range(0, boxes.shape[0], num_parall_queries):
         batch_boxes = boxes[i:i+num_parall_queries]
         print('boxes_area: ', torch.sum((batch_boxes[:,2]-batch_boxes[:,0])*(batch_boxes[:,3]-batch_boxes[:,1])).item())
-        try:
-            print('boxes[i:i+num_parall_queries].shape: ', batch_boxes.shape)
-            masks, quality, low_res_logits = evit_sam_predictor.predict_torch(boxes = boxes[i:i+num_parall_queries],
-                                                                                multimask_output=multimask_output,
-                                                                                return_logits=return_logits) # shape: (n_boxes, n_masks, h_patch, w_patch)
-            
-            #get the best masks
-            masks = masks[torch.arange(masks.shape[0]), torch.argmax(quality, dim=1)] #shape (n_boxes, h_patch, w_patch)
-            
-            print('masks_shape', masks.shape)
-            tmp_all_masks = torch.cat((tmp_all_masks, masks), dim=0)
-            
-            #masks_on_gpu += num_parall_queries
-            masks_on_gpu = tmp_all_masks.shape[0]
-            
-            if masks_on_gpu >= threshold_to_cpu or (i + num_parall_queries) >= boxes.shape[0]:
-                print('\nMoving masks to gpu. Num. mask_on_gpu: ', masks_on_gpu)
-                tmp_all_masks = tmp_all_masks.cpu().numpy() #move to cpu
-                all_masks_np = np.concatenate((all_masks_np, tmp_all_masks), axis=0)
-                tmp_all_masks = evit_utils.placeholder_masks(original_img_h_w, device, 'torch')
+
+        print('boxes[i:i+num_parall_queries].shape: ', batch_boxes.shape)
+        masks, quality, low_res_logits = evit_sam_predictor.predict_torch(boxes = boxes[i:i+num_parall_queries],
+                                                                            multimask_output=multimask_output,
+                                                                            return_logits=return_logits) # shape: (n_boxes, n_masks, h_patch, w_patch)
+        
+        #get the best masks
+        masks = masks[torch.arange(masks.shape[0]), torch.argmax(quality, dim=1)] #shape (n_boxes, h_patch, w_patch)
+        
+        print('masks_shape', masks.shape)
+        tmp_all_masks = torch.cat((tmp_all_masks, masks), dim=0)
+        
+        #masks_on_gpu += num_parall_queries
+        masks_on_gpu = tmp_all_masks.shape[0]
+        
+        if masks_on_gpu >= threshold_to_cpu or (i + num_parall_queries) >= boxes.shape[0]:
+            print('\nMoving masks to gpu. Num. mask_on_gpu: ', masks_on_gpu)
+            tmp_all_masks = tmp_all_masks.cpu().numpy() #move to cpu
+            all_masks_np = np.concatenate((all_masks_np, tmp_all_masks), axis=0)
+            tmp_all_masks = evit_utils.placeholder_masks(original_img_h_w, device, 'torch')
                 
-        except Exception as e:
-            torch.cuda.memory._dump_snapshot(f"my_snapshot_ERROR_np.pickle")
-            print('\n\n#####ERROR#####\n\n')
-            print(e)
-            sys.exit()
+
 
     #for each box take mask with best quality
     tree_build_mask = evit_utils.separate_classes_numpy(all_masks_np, num_trees = num_tree_boxes)

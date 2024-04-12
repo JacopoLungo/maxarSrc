@@ -583,7 +583,7 @@ class Mosaic:
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
 
-    def evit_tree_and_build_tile(self, tile_path, debug = False):
+    def evit_tree_and_build_tile(self, tile_path, debug = False) -> np.ndarray:
         """
         
         """
@@ -613,7 +613,7 @@ class Mosaic:
         
         multimask_output = True #TODO da inserire come parametro
         return_logits = True #TODO da inserire come parametro
-        num_parall_queries = 200 #TODO da inserire come parametro
+        num_parall_queries = 100 #TODO da inserire come parametro
         
         device = self.event.evit_sam_predictor.device
         print('Start segmenting..')
@@ -627,7 +627,7 @@ class Mosaic:
             tree_boxes = detect.evit_get_batch_box_prompt(patch_bbox,
                                                         trees_gdf,
                                                         dataset.res,
-                                                        ext_mt = 0)
+                                                        ext_mt = 1)
 
             #BUILDINGS
             building_boxes = detect.evit_get_batch_box_prompt(patch_bbox,
@@ -637,23 +637,12 @@ class Mosaic:
             
             if tree_boxes.shape[0] > 0 or building_boxes.shape[0] > 0:
                 boxes = torch.cat((tree_boxes, building_boxes), dim=0).to(device) #no need to apply (rescale) boxes or image since image is enforced to have size == model.image_size
-                if boxes.shape[0]>200:
-                    torch.cuda.memory._record_memory_history()
+                
                 self.event.evit_sam_predictor.set_image(original_img_np, image_format = 'RGB')
-                print('boxes.shape: ', boxes.shape)
+                #print('boxes.shape: ', boxes.shape)
                 ESAM_start = time()
                 
                 #SEGMENTING
-                #OLD METHOD
-                """tree_build_mask = evit_from_input(boxes,
-                                            num_tree_boxes = tree_boxes.shape[0],
-                                            evit_sam_predictor = self.event.evit_sam_predictor,
-                                            original_img_h_w = original_img_h_w,
-                                            num_parall_queries = num_parall_queries,
-                                            device = device,
-                                            multimask_output = multimask_output,
-                                            return_logits=return_logits)"""
-                
                 tree_build_mask = evit_segment.evit_from_input_maybe_fast(boxes,
                                                     num_tree_boxes = tree_boxes.shape[0],
                                                     evit_sam_predictor = self.event.evit_sam_predictor,
@@ -662,20 +651,26 @@ class Mosaic:
                                                     device = device,
                                                     multimask_output = multimask_output,
                                                     return_logits=return_logits)
-                                            
-                if boxes.shape[0]>200:
-                    torch.cuda.memory._dump_snapshot(f"my_snapshot_{batch_ix}_maybe_fast.pickle")
+                
                 Esam_total += time() - ESAM_start
 
             else: 
-                print('no prompts in patch, skipping...')
+                #print('no prompts in patch, skipping...')
                 if return_logits:
                     tree_build_mask = np.full((2, *original_img_h_w), fill_value=float('-inf')) #(2, h, w)
                 else:
                     tree_build_mask = np.full((2, *original_img_h_w), fill_value=False) #(2, h, w)
             
-            post_proc_start = time()        
-            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+            post_proc_start = time()
+            
+            if True:
+                canvas = segment_utils.write_canvas_geo(canvas= canvas,
+                                                        patch_masks_b =  np.expand_dims(tree_build_mask, axis=0),
+                                                        top_lft_indexes = batch['top_lft_index'],
+                                                        smooth = False)
+            
+            else:
+                canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
                                                                     weights = weights,
                                                                     patch_masks_b = np.expand_dims(tree_build_mask, axis=0),
                                                                     top_lft_indexes = batch['top_lft_index'],
@@ -684,15 +679,17 @@ class Mosaic:
 
             post_proc_total += time() - post_proc_start
                 
-            if batch_ix%100 == 0 and batch_ix != 0:
-                print('Avg times (sec/batch)')
-                print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
-                
-            #if True and batch_ix == 25:
-            #    break
+            #if batch_ix%500 == 0 and batch_ix != 0:
+            #    print('Avg times (sec/batch)')
+            #    print(f'- ESAM: {(Esam_total/(batch_ix + 1)):.4f}')
+            
+            if batch_ix == 50:
+                break
         
         # divide by the weights to get the average
-        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        if False:
+            canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
@@ -704,7 +701,6 @@ class Mosaic:
                 if 'new', tree are computed at patch level (ESAM),
                 if 'evit', tree are computed using 'evit' (ESAM)
         """
-        torch.cuda.memory._record_memory_history()
         seg_config = self.event.seg_config
         
         if self.build_gdf is None:
@@ -733,11 +729,14 @@ class Mosaic:
         else:
             tree_and_build_mask = self.evit_tree_and_build_tile(tile_path)
         
+        #FIXME: here masks are empty
+        
+        
         road_mask = self.seg_road_tile(tile_path)
-        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask[:-1]) , axis = 0)
+        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask), axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         
-        if seg_config.clean_masks_bool:
+        if seg_config.clean_masks_bool and False:
             print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
             no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
                                                         area_threshold = seg_config.ski_rmv_holes_area_th,
