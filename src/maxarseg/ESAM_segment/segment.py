@@ -47,3 +47,66 @@ def ESAM_from_inputs(original_img_tsr: torch.Tensor, #b, c, h, w
         
     
     return np_complete_masks #shape (b, masks, h, w)
+
+def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
+                        input_points: torch.Tensor, #b, max_queries, 2, 2
+                        input_labels: torch.Tensor, #b, max_queries, 2
+                        efficient_sam,
+                        num_tree_boxes, #(b, 1)
+                        num_parall_queries: int = 5,
+                        device = 'cpu'):
+    #torch.cuda.memory._record_memory_history()
+    
+    num_tree_boxes = int(num_tree_boxes[0])
+    
+    original_img_tsr = original_img_tsr.div(255)
+    batch_size, _, input_h, input_w = original_img_tsr.shape
+    
+    original_img_tsr = original_img_tsr.to(device)
+    input_points = input_points.to(device)
+    input_labels = input_labels.to(device)
+    with torch.no_grad():
+        image_embeddings = efficient_sam.get_image_embeddings(original_img_tsr)
+    
+    del original_img_tsr
+        
+    tree_build_mask = torch.full((2, input_h, input_w), float('-inf'), dtype = torch.float32, device = device)
+    num_batch_tree_only = num_tree_boxes // num_parall_queries
+    trees_in_mixed_batch = round(num_parall_queries * (num_tree_boxes/num_parall_queries -  num_tree_boxes // num_parall_queries))
+
+    stop = input_points.shape[1]
+    #torch.cuda.memory._dump_snapshot("my_snapshot_before_for_loop.pickle")
+
+    for y, i in enumerate(range(0, stop , num_parall_queries)):
+        start_idx = i
+        end_idx = min(i + num_parall_queries, stop)
+
+        with torch.no_grad():
+            predicted_logits, predicted_iou = efficient_sam.predict_masks(image_embeddings,
+                                                                    input_points[:, start_idx: end_idx],
+                                                                    input_labels[:, start_idx: end_idx],
+                                                                    multimask_output=True,
+                                                                    input_h = input_h,
+                                                                    input_w = input_w,
+                                                                    output_h=input_h,
+                                                                    output_w=input_w)
+        
+        #torch.cuda.memory._dump_snapshot("my_snapshot_after_predict_masks.pickle")
+        del predicted_iou
+        
+        masks = predicted_logits[0,:,0]#.cpu().detach().numpy() # (num_img, prompt, multi, h, w) -> (max_queries, h, w)
+        
+        del predicted_logits
+        
+        if y < num_batch_tree_only or input_points[0, start_idx: end_idx].shape[0] == trees_in_mixed_batch: #only trees
+            tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks, dim=0).values)
+        elif y > num_batch_tree_only or trees_in_mixed_batch == 0: #only build
+            tree_build_mask[1] = torch.max(tree_build_mask[1], torch.max(masks, dim=0).values)
+        else: #trees and build
+            tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks[:trees_in_mixed_batch], dim=0).values)
+            tree_build_mask[1] = torch.max(tree_build_mask[1], torch.max(masks[trees_in_mixed_batch:], dim=0).values)
+        
+        del masks
+
+    tree_build_mask = tree_build_mask.cpu().detach().numpy()
+    return tree_build_mask #shape (b, masks, h, w)
