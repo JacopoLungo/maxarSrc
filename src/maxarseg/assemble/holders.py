@@ -187,11 +187,14 @@ class Mosaic:
             
         config = self.event.det_config
         
-        GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path)
+        #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path)
         deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
         
-        glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
-        glb_tile_tree_scores = np.concatenate((GD_scores, deepForest_scores))
+        #glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
+        #glb_tile_tree_scores = np.concatenate((GD_scores, deepForest_scores))
+        
+        glb_tile_tree_boxes = deepForest_glb_tile_tree_boxes
+        glb_tile_tree_scores = deepForest_scores
         
         print('Number of tree boxes before filtering: ', len(glb_tile_tree_boxes))
         
@@ -787,10 +790,10 @@ class Mosaic:
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
         
-        output.masks2parquet(tile_path,
+        """output.masks2parquet(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
-                        out_dir_root = out_dir_root)
+                        out_dir_root = out_dir_root)"""
         
         return True
         

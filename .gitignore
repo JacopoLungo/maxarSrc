@@ -159,3 +159,6 @@ outputs/
 .vscode/tasks.json
 
 .python-version
+
+#gpu memory snapshots
+*.pickle
