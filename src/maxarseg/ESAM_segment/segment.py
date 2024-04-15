@@ -70,7 +70,7 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
     
     del original_img_tsr
         
-    tree_build_mask = torch.full((2, input_h, input_w), float('-inf'), dtype = torch.float32, device = device)
+    tree_build_mask = torch.full((2, input_h, input_w), float(0), dtype = torch.float32, device = device)
     num_batch_tree_only = num_tree_boxes // num_parall_queries
     trees_in_mixed_batch = round(num_parall_queries * (num_tree_boxes/num_parall_queries -  num_tree_boxes // num_parall_queries))
 

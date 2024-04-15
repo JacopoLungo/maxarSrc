@@ -708,7 +708,7 @@ class Mosaic:
                                                                     proj_gdf = self.proj_build_gdf,
                                                                     dataset_res = dataset.res,
                                                                     ext_mt = seg_config.ext_mt_build_box)
-            
+
             if num_trees4img[0] > 0 or num_build4img[0] > 0:
                 
                 max_detect = max(num_trees4img + num_build4img)
@@ -728,7 +728,7 @@ class Mosaic:
             
             else:
                 #print('no prompts in patch, skipping...')
-                tree_build_mask = np.full((2, *original_img_tsr.shape[2:]), fill_value=float('-inf')) #(2, h, w)
+                tree_build_mask = np.full((2, *original_img_tsr.shape[2:]), fill_value=float(0)) #(2, h, w)
             
             canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
                                                                     weights = weights,
@@ -739,7 +739,9 @@ class Mosaic:
         canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
-        
+        # pad canvas by adding a 0 channel, as consistent with the older method
+        # canvas = np.concatenate((np.zeros_like(canvas[[0]]), canvas), axis = 0)
+
         return canvas
     
     def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False, separate_masks = True):
@@ -773,7 +775,7 @@ class Mosaic:
             tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
         road_mask = self.seg_road_tile(tile_path)
-        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask[:-1]) , axis = 0)
+        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         
         if seg_config.clean_masks_bool:
@@ -782,7 +784,7 @@ class Mosaic:
                                                          area_threshold = seg_config.ski_rmv_holes_area_th,
                                                          min_size = seg_config.rmv_small_obj_area_th)
         
-        no_overlap_masks_copy = no_overlap_masks.copy()
+        # no_overlap_masks_copy = no_overlap_masks.copy()
 
         output.masks2Tifs(tile_path,
                         no_overlap_masks,
