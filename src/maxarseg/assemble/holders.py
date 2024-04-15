@@ -667,7 +667,78 @@ class Mosaic:
             
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
+    
+    def seg_glb_tree_and_build_tile_fast(self, tile_path: str ):
+
+        if self.build_gdf is None: #set buildings at mosaic level
+            self.set_build_gdf()
         
+        trees_gdf = self.detect_trees_tile(tile_path, georef = True)
+        
+        seg_config = self.event.seg_config
+
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
+        sampler = samplers.BatchGridGeoSampler(dataset,
+                                            batch_size=seg_config.batch_size,
+                                            size=seg_config.size,
+                                            stride=seg_config.stride)
+        dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
+        
+        canvas = np.full((2,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
+        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
+        
+        for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
+
+            #TREES
+            #get the tree boxes in batches and the number of trees for each image
+            #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
+            tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
+                                                                proj_gdf = trees_gdf,
+                                                                dataset_res = dataset.res,
+                                                                ext_mt = 0)
+            
+            #BUILDINGS
+            #get the building boxes in batches and the number of buildings for each image
+            #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
+            building_boxes_b, num_build4img = detect.get_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = self.proj_build_gdf,
+                                                                    dataset_res = dataset.res,
+                                                                    ext_mt = seg_config.ext_mt_build_box)
+            
+            if num_trees4img[0] > 0 or num_build4img[0] > 0:
+                
+                original_img_tsr = batch['image']
+                max_detect = max(num_trees4img + num_build4img)
+                
+                #obtain the right input for the ESAM model (trees + buildings)
+                input_points, input_labels = segment_utils.get_input_pts_and_lbs(tree_boxes_b, building_boxes_b, max_detect)
+                
+                # segment the image and get for each image as many masks as the number of boxes,
+                # for GPU constraint use num_parall_queries
+                tree_build_mask = segment.ESAM_from_inputs_fast(original_img_tsr = original_img_tsr,
+                                                            input_points = torch.from_numpy(input_points),
+                                                            input_labels = torch.from_numpy(input_labels),
+                                                            num_tree_boxes= num_trees4img,
+                                                            efficient_sam = seg_config.efficient_sam,
+                                                            device = seg_config.device,
+                                                            num_parall_queries = seg_config.ESAM_num_parall_queries)
+            
+            else:
+                #print('no prompts in patch, skipping...')
+                tree_build_mask = np.full((2, *original_img_tsr.shape[2:]), fill_value=float('-inf')) #(2, h, w)
+            
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                                    weights = weights,
+                                                                    patch_masks_b =  np.expand_dims(tree_build_mask, axis=0),
+                                                                    top_lft_indexes = batch['top_lft_index'],
+                                                                    )
+
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
+        canvas = np.greater(canvas, 0) #turn logits into bool
+        canvas = np.where(dataset.aoi_mask, canvas, False)
+        
+        return canvas
+    
     def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False, separate_masks = True):
         """
         glbl_det: if True tree detection are computed at tile level, if False at patch level
@@ -694,7 +765,7 @@ class Mosaic:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
         if glbl_det:
-            tree_and_build_mask = self.seg_glb_tree_and_build_tile(tile_path)
+            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path)
         else:
             tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
