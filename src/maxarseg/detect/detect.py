@@ -1,7 +1,7 @@
 from maxarseg.detect import detect_utils
 from groundingdino.util.inference import predict as GD_predict
 import numpy as np
-from typing import List
+from typing import List, Tuple
 import geopandas as gpd
 from maxarseg.samplers import samplers, samplers_utils
 from maxarseg.geo_datasets import geoDatasets
@@ -68,7 +68,7 @@ def get_batch_buildings_boxes(batch_bbox: List[BoundingBox], proj_buildings_gdf:
     return batch_building_boxes, np.array(num_build4img)
 
 #used in seg_tile_glbl
-def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 0):
+def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 0) -> Tuple[List[np.ndarray], np.ndarray]:
     """
     Given a batch of bounding boxes in a proj crs, it returns the boxes in the right coordinates relative to the sampled patch. 
     It is necessary that the bbox and the gdf are in the same crs.
@@ -87,7 +87,7 @@ def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, d
         num_boxes4img.append(len(hits)) #append number of boxes
         
         if len(hits) > 0: #if there is at least a box in the query_bbox_poly
-                      
+            
             boxes = samplers_utils.rel_bbox_coords(geodf = proj_gdf.iloc[hits],
                                                     ref_coords = query_patch_poly.bounds,
                                                     res = dataset_res,

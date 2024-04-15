@@ -1,0 +1,26 @@
+event_ix: 16
+when: pre
+GD_bs: 1
+DF_bs: 1
+device_det: cuda:0
+size_det: 600
+stride_det: 400
+GD_root: "./models/GDINO"
+GD_config_file: "configs/GroundingDINO_SwinT_OGC.py"
+GD_weights: "weights/groundingdino_swint_ogc.pth"
+text_prompt: "green tree"
+box_threshold: 0.15
+text_threshold: 0.30
+max_area_GD_boxes_mt2: 6000
+min_ratio_GD_boxes_edges: 0.0
+perc_reduce_tree_boxes: 0.0
+use_evit: false
+bs_seg: 2
+device_seg: cuda:0
+size_seg: 600
+stride_seg: 400
+ext_mt_build_box: 0
+road_width_mt: 5
+ESAM_root: "./models/EfficientSAM"
+ESAM_num_parall_queries: 5
+out_dir_root: "./output/tiff"

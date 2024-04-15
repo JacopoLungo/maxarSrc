@@ -133,7 +133,7 @@ class DetectConfig:
         self.DF_patch_size = DF_patch_size
         self.DF_patch_overlap = DF_patch_overlap
         self.DF_box_threshold = DF_box_threshold
-        self.DF_device = [int(device.split(':')[-1])] if len(device.split(':')) > 1 else 'auto' #Remove the port number from the device (e.g. 'cuda:0' -> 'cuda'
+        self.DF_device = [int(device.split(':')[-1])] if len(device.split(':')) > 1 else 'auto' #Remove the port number from the device (e.g. 'cuda:0' -> 'cuda')
         self.DF_batch_size = DF_batch_size
         
         #Filtering

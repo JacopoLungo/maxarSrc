@@ -1,0 +1,40 @@
+#General
+event_ix: 2 #Gambia
+when: pre
+
+#Detection General
+device_det: cuda:0
+size_det: 600
+stride_det: 400
+
+#Grounding Dino
+GD_bs: 1
+GD_root: "./models/GDINO"
+GD_config_file: "configs/GroundingDINO_SwinT_OGC.py"
+GD_weights: "weights/groundingdino_swint_ogc.pth"
+text_prompt: "bush"
+box_threshold: 0.15
+text_threshold: 0.30
+
+#Deep Forest
+DF_bs: 32
+
+#Detection filtering
+max_area_GD_boxes_mt2: 6000
+min_ratio_GD_boxes_edges: 0.0
+perc_reduce_tree_boxes: 0.0
+
+use_evit: false
+
+#Segmentation w/evit
+bs_seg: 2 # useless when using evit
+device_seg: cuda:0
+size_seg: 600 #useless when using evit
+stride_seg: 700 #it should depend on the model used 
+ext_mt_build_box: 0
+road_width_mt: 5
+ESAM_root: "./models/EfficientSAM" #useless when using evit
+ESAM_num_parall_queries: 5 #useless when using evit
+out_dir_root: "./output/tiff"
+
+

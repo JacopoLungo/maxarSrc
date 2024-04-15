@@ -254,7 +254,6 @@ def write_canvas_geo_window(canvas: np.ndarray,
 
 
 
-    
 def clean_masks(masks: np.ndarray, area_threshold = 80, min_size = 80) -> np.ndarray:
     """
     Cleans the input masks by removing small holes and objects.

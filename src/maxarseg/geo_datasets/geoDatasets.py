@@ -132,7 +132,11 @@ class MxrSingleTileNoEmpty(RasterDataset):
         
         self.tile_aoi = samplers_utils.path_2_tile_aoi(self.files[0])
         self.aoi_mask = rasterize([self.tile_aoi], out_shape = self.tile_shape, fill=False, default_value=True, transform = self.transform)
-    
+        #TODO: mettere qui i geodf degli edifici e degli alberi in modo da usarli nel sampler per evitare quelle patch che
+        #non hanno edifici o alberi
+        self.buildings_gdf = None
+        self.trees_gdf = None
+        
     def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
         """Retrieve image/mask and metadata indexed by query.
 

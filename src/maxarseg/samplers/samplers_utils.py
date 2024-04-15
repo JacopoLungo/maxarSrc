@@ -81,7 +81,7 @@ def align_bbox(bbox: Polygon):
 def rel_bbox_coords(geodf:gpd.GeoDataFrame,
                     ref_coords:tuple,
                     res,
-                    ext_mt: int = 0):
+                    ext_mt: int = 0) -> List[List[float]]:
     """
     Returns the relative coordinates of a bbox w.r.t. a reference bbox in the 'geometry' column.
     Goes from absolute geo coords to relative coords in the image.
