@@ -1,6 +1,7 @@
 #Generic
 from pathlib import Path
 from tqdm import tqdm
+import threading
 
 from time import time, perf_counter
 import numpy as np
@@ -735,6 +736,14 @@ class Mosaic:
                                                                     patch_masks_b =  np.expand_dims(tree_build_mask, axis=0),
                                                                     top_lft_indexes = batch['top_lft_index'],
                                                                     )
+                        # old version
+            """canvas = segment_utils.write_canvas_geo(canvas= canvas,
+                                                    patch_masks_b =  np.expand_dims(tree_build_mask, axis=0),
+                                                    top_lft_indexes = batch['top_lft_index'],
+                                                    smooth = False)"""
+
+
+
 
         canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
         canvas = np.greater(canvas, 0) #turn logits into bool
@@ -774,6 +783,13 @@ class Mosaic:
         else:
             tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
+
+        thread = threading.Thread(target=self.segment_tile_thread,
+                                    args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks))
+        
+        thread.start()
+
+        """
         road_mask = self.seg_road_tile(tile_path)
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
@@ -783,21 +799,49 @@ class Mosaic:
             no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
                                                          area_threshold = seg_config.ski_rmv_holes_area_th,
                                                          min_size = seg_config.rmv_small_obj_area_th)
-        
-        # no_overlap_masks_copy = no_overlap_masks.copy()
+        """
 
-        output.masks2Tifs(tile_path,
+        """output.masks2Tifs(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
                         separate_masks = separate_masks,
-                        out_dir_root = out_dir_root)
+                        out_dir_root = out_dir_root)"""
         
+        """
+        # Create a Thread object.
+        thread = threading.Thread(target=output.masks2Tifs,
+                                    args=(tile_path, no_overlap_masks, out_names, separate_masks, out_dir_root))
+        
+
+        # Start the thread.
+        thread.start()
+        """
+
+
         """output.masks2parquet(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
                         out_dir_root = out_dir_root)"""
         
         return True
+
+
+    # function that wraps from seg_glb_tree_and_build_tile_fast to mask2Tifs to be used in a separate thread
+    def segment_tile_thread(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks = True):
+        road_mask = self.seg_road_tile(tile_path)
+        overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
+        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)  
+        if seg_config.clean_masks_bool:
+            print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
+            no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
+                                                         area_threshold = seg_config.ski_rmv_holes_area_th,
+                                                         min_size = seg_config.rmv_small_obj_area_th)
+        output.masks2Tifs(tile_path,
+                        no_overlap_masks,
+                        out_names = out_names,
+                        separate_masks = separate_masks,
+                        out_dir_root = out_dir_root)
+        
         
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
