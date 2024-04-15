@@ -691,6 +691,7 @@ class Mosaic:
         weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
         
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
+            original_img_tsr = batch['image']
 
             #TREES
             #get the tree boxes in batches and the number of trees for each image
@@ -710,7 +711,6 @@ class Mosaic:
             
             if num_trees4img[0] > 0 or num_build4img[0] > 0:
                 
-                original_img_tsr = batch['image']
                 max_detect = max(num_trees4img + num_build4img)
                 
                 #obtain the right input for the ESAM model (trees + buildings)
