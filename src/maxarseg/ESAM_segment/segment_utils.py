@@ -240,17 +240,21 @@ def write_canvas_geo_window(canvas: np.ndarray,
     # initialize the window, a 2d array containing a cosine window, of the same size as the patch
     window = np.outer(np.hanning(patch_masks_b.shape[-1]), np.hanning(patch_masks_b.shape[-1]))
     
-    size = patch_masks_b.shape[-1]
+    mask_size = patch_masks_b.shape[-1]
+    
     for patch_mask, top_left_index in zip(patch_masks_b, top_lft_indexes):
-        I = np.s_[:, top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
-        I_weight = np.s_[top_left_index[0]: top_left_index[0] + size, top_left_index[1]: top_left_index[1] + size] #index var in the canvas where to add the patch
-        #max_idxs is useful when reached the border of the canva, it contains the height and width that you can write on the canva
-        max_idxs = canvas[I].shape[1:]
+        c_start_y = max(0, top_left_index[0])
+        c_start_x = max(0, top_left_index[1])
+        c_end_y = min(canvas.shape[1], top_left_index[0] + mask_size)
+        c_end_x = min(canvas.shape[2], top_left_index[1] + mask_size)
         
-        #print('\nparte di canva', canvas[:, inv_base: inv_base + size, base: base + size].shape)
-        #print('patch', patch_mask[:, :max_idxs[0], :max_idxs[1]].shape)
-        canvas[I] = canvas[I] + patch_mask[:, :max_idxs[0], :max_idxs[1]] * window[:max_idxs[0], :max_idxs[1]]
-        weights[I_weight] = weights[I_weight] + window[:max_idxs[0], :max_idxs[1]]
+        m_start_y = max(0, -top_left_index[0])
+        m_start_x = max(0, -top_left_index[1])
+        m_end_y = m_start_y + (c_end_y - c_start_y)
+        m_end_x = m_start_x + (c_end_x - c_start_x)
+                
+        canvas[:, c_start_y: c_end_y, c_start_x: c_end_x] = canvas[:, c_start_y: c_end_y, c_start_x: c_end_x] + patch_mask[:, m_start_y: m_end_y, m_start_x: m_end_x] * window[m_start_y: m_end_y, m_start_x: m_end_x]
+        weights[c_start_y: c_end_y, c_start_x: c_end_x] = weights[c_start_y: c_end_y, c_start_x: c_end_x] + window[m_start_y: m_end_y, m_start_x: m_end_x]
 
     return canvas, weights
 
