@@ -46,7 +46,6 @@ def ESAM_from_inputs(original_img_tsr: torch.tensor, #b, c, h, w
     else: #if there are no queries (in any image in the batch)
         np_complete_masks = np.ones((batch_size, 0, input_h, input_w)) * float('-inf') #equal to set False on all the mask
         
-    
     return np_complete_masks #shape (b, masks, h, w)
 
 def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
@@ -67,9 +66,7 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
     input_labels = input_labels.to(device)
     with torch.no_grad():
         image_embeddings = efficient_sam.get_image_embeddings(original_img_tsr)
-    
-    del original_img_tsr
-        
+
     tree_build_mask = torch.full((2, input_h, input_w), float(0), dtype = torch.float32, device = device)
     num_batch_tree_only = num_tree_boxes // num_parall_queries
     trees_in_mixed_batch = round(num_parall_queries * (num_tree_boxes/num_parall_queries -  num_tree_boxes // num_parall_queries))
@@ -90,11 +87,7 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
                                                                     output_h=input_h,
                                                                     output_w=input_w)
         
-        del predicted_iou
-        
         masks = predicted_logits[0,:,0]#.cpu().detach().numpy() # (num_img, prompt, multi, h, w) -> (max_queries, h, w)
-        
-        del predicted_logits
         
         if y < num_batch_tree_only or input_points[0, start_idx: end_idx].shape[0] == trees_in_mixed_batch: #only trees
             tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks, dim=0).values)
@@ -103,8 +96,6 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
         else: #trees and build
             tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks[:trees_in_mixed_batch], dim=0).values)
             tree_build_mask[1] = torch.max(tree_build_mask[1], torch.max(masks[trees_in_mixed_batch:], dim=0).values)
-        
-        del masks
 
     tree_build_mask = tree_build_mask.cpu().detach().numpy()
     return tree_build_mask #shape (b, masks, h, w)
