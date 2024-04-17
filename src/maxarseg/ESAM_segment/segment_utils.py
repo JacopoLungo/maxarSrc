@@ -223,7 +223,7 @@ def write_canvas_geo(canvas: np.array,
 def write_canvas_geo_window(canvas: np.ndarray,
                             weights: np.ndarray,
                     patch_masks_b: np.ndarray,
-                    top_lft_indexes: List) -> np.ndarray:
+                    top_lft_indexes: List):
     """
     Write the patch masks in the canvas.
 

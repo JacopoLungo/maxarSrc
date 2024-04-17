@@ -13,7 +13,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Segment Maxar Tiles')
     #event
-    parser.add_argument('--event_ix', default = 16, type = int, help='Index of the event in the list events_names')
+    parser.add_argument('--event_ix', default = 2, type = int, help='Index of the event in the list events_names')
     parser.add_argument('--when', default = 'pre', choices=['pre', 'post', 'None'], help='Select the pre or post event mosaics')
     
     #Detect config
@@ -38,11 +38,11 @@ def main():
     parser.add_argument('--perc_reduce_tree_boxes', default = 0, type = float, help = 'Percentage of reduction of the tree boxes')
     
     #Segment config
-    parser.add_argument('--bs_seg', default = 2, type = int, help = 'Batch size for the segmentation')
+    parser.add_argument('--bs_seg', default = 1, type = int, help = 'Batch size for the segmentation')
     parser.add_argument('--device_seg', default = 'cuda:0', help='device to use')
     
-    parser.add_argument('--size_seg', default = 600, type = int, help = 'Size of the patch')
-    parser.add_argument('--stride_seg', default = 400, type = int, help = 'Stride of the patch')
+    parser.add_argument('--size_seg', default = 1024, type = int, help = 'Size of the patch')
+    parser.add_argument('--stride_seg', default = 1024 - 256, type = int, help = 'Stride of the patch')
     
     parser.add_argument('--ext_mt_build_box', default = 0, type = int, help = 'Extra meter to enlarge building boxes')
     
@@ -51,7 +51,7 @@ def main():
     #Efficient SAM
     parser.add_argument('--ESAM_root', default = './models/EfficientSAM', help = 'Root of the efficient sam model')
     parser.add_argument('--ESAM_num_parall_queries', default = 5, type = int, help = 'Set the number of paraller queries to be processed')
-    parser.add_argument('--out_dir_root', default = "./output/tiff", help='output directory root')
+    parser.add_argument('--out_dir_root', default = "./output/tiff/prova_write_canvas", help='output directory root')
 
     args = parser.parse_args()
         
@@ -96,13 +96,14 @@ def main():
     
     all_mosaics_names = event.all_mosaics_names
     
-    event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
+    #event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
     
-    # m0 = event.mosaics[all_mosaics_names[0]]
+    m0 = event.mosaics[all_mosaics_names[0]]
     # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
     
     # m0_tile_17_path = m0.tiles_paths[17]
-    # m0.segment_tile(m0_tile_17_path, args.out_dir_root, glbl_det = True)
+    tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031231.tif'
+    m0.segment_tile(tile_path, args.out_dir_root, glbl_det = True, separate_masks = False)
 
 
 if __name__ == "__main__":
