@@ -1,6 +1,7 @@
 #Generic
 from pathlib import Path
 from tqdm import tqdm
+import threading
 
 from time import time, perf_counter
 import numpy as np
@@ -64,6 +65,11 @@ class Mosaic:
         self.proj_build_gdf = None
         self.build_num = None
 
+        #models
+        self.GD_model = None
+        self.DF_model = None
+        self.ESAM_model = None
+
     def __str__(self) -> str:
         return self.name
     
@@ -116,13 +122,14 @@ class Mosaic:
     
     def detect_trees_tile_DeepForest(self, tile_path) -> Tuple[np.ndarray, ...]:
         config = self.event.det_config
-        model = main.deepforest(config_args = { 'devices' : config.DF_device,
-                                                'retinanet': {'score_thresh': config.DF_box_threshold},
-                                                'accelerator': 'cuda',
-                                                'batch_size': config.DF_batch_size})
-        model.use_release()
+        if self.DF_model is None:
+            self.DF_model = main.deepforest(config_args = { 'devices' : config.DF_device,
+                                                    'retinanet': {'score_thresh': config.DF_box_threshold},
+                                                    'accelerator': 'cuda',
+                                                    'batch_size': config.DF_batch_size})
+            self.DF_model.use_release()
         
-        boxes_df = model.predict_tile(tile_path,
+        boxes_df = self.DF_model.predict_tile(tile_path,
                                     return_plot = False,
                                     patch_size = config.DF_patch_size,
                                     patch_overlap = config.DF_patch_overlap)
@@ -130,9 +137,6 @@ class Mosaic:
         
         boxes = boxes_df.iloc[:, :4].values
         score = boxes_df['score'].values
-        
-        del model
-        torch.cuda.empty_cache()
         
         return boxes, score
     
@@ -739,9 +743,6 @@ class Mosaic:
         canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
-        # pad canvas by adding a 0 channel, as consistent with the older method
-        # canvas = np.concatenate((np.zeros_like(canvas[[0]]), canvas), axis = 0)
-
         return canvas
     
     def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False, separate_masks = True):
@@ -774,30 +775,31 @@ class Mosaic:
         else:
             tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
         
+
+        thread = threading.Thread(target=self.postprocess_and_save,
+                                    args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks))
+        
+        thread.start()
+
+        return True
+
+
+    # function that wraps from postprocessing to be used in a separate thread
+    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks = True):
         road_mask = self.seg_road_tile(tile_path)
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
-        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
-        
+        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)  
         if seg_config.clean_masks_bool:
             print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
             no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
                                                          area_threshold = seg_config.ski_rmv_holes_area_th,
                                                          min_size = seg_config.rmv_small_obj_area_th)
-        
-        # no_overlap_masks_copy = no_overlap_masks.copy()
-
         output.masks2Tifs(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
         
-        """output.masks2parquet(tile_path,
-                        no_overlap_masks,
-                        out_names = out_names,
-                        out_dir_root = out_dir_root)"""
-        
-        return True
         
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
