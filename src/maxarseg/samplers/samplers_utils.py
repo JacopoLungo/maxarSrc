@@ -7,6 +7,8 @@ import numpy as np
 import geopandas as gpd
 from maxarseg.geo_datasets import geoDatasets
 from shapely.geometry.polygon import Polygon
+from shapely import geometry
+import rasterio
 
 #from maxarseg import segment
 
@@ -31,6 +33,48 @@ def path_2_tile_aoi(tile_path, root = '/nfs/projects/overwatch/maxar-segmentatio
     j = [el["properties"]["proj:geometry"] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
     tile_polyg = shapely.geometry.shape(j)
     return tile_polyg
+
+def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ) -> List:
+    """
+    Create a shapely Polygon from a tile_path
+    Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
+    """
+    if isinstance(tile_path, str):
+        event = tile_path.split('/')[-4]
+        child = tile_path.split('/')[-2]
+        tile = tile_path.split('/')[-1].replace(".tif", "")
+    elif isinstance(tile_path, Path):
+        event = tile_path.parts[-4]
+        child = tile_path.parts[-2]
+        tile = tile_path.parts[-1].replace(".tif", "")
+    else:
+        raise TypeError("tile_path must be a string or a Path object")
+    path_2_child_geojson = os.path.join(root, event, child +'.geojson')
+    with open(path_2_child_geojson, 'r') as f:
+        child_geojson = json.load(f)
+    
+    prj_crs = [el['properties']['proj:epsg'] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
+    j = [el["geometry"] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
+    tile_polyg = shapely.geometry.shape(j)
+    
+    tile_adj_aois = []
+    if land_gdf is None: #caso in cui tutto l'evento non interseca confine wl
+        tile_adj_aois.append(tile_polyg)
+    else:
+        intersection_gdf = land_gdf.intersection(tile_polyg).loc[lambda x: ~x.is_empty]
+        if len(intersection_gdf) == 0:
+            print('Tile non interseca land. Solo mare. Mask vuota')
+            tile_adj_aois.append(Polygon())
+        else:
+            if land_gdf.contains(tile_polyg).any():
+                print('Completely contained in land. No mod to tile_aoi')
+                tile_adj_aois.append(tile_polyg)
+            else:
+                print('Tile interseca wlb')
+                for geom in intersection_gdf:
+                    tile_adj_aois.append(geom)
+                    
+    return gpd.GeoDataFrame(geometry = tile_adj_aois, crs="EPSG:4326").to_crs(prj_crs)
 
 def boundingBox_2_Polygon(bounding_box):
     """
@@ -61,7 +105,6 @@ def xyxyBox2Polygon(xyxy_box):
     vertices = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny)]
     bbox_polyg = shapely.geometry.Polygon(vertices)
     return bbox_polyg
-    
 
 def boundingBox_2_centralPoint(bounding_box):
     """
@@ -122,3 +165,18 @@ def tile_sizes(dataset: geoDatasets.MxrSingleTile):
         raise ValueError("The sizes of the tile are not integers")
     
     return (int(x_size_pxl), int(y_size_pxl))
+
+def tile_path_2_tile_size(tile_path):
+    """
+    Returns the sizes of the tile given the path
+    """
+    with rasterio.open(tile_path) as src:
+        return src.width, src.height
+
+def double_tuple_box_2_shapely_box(double_tuple_box):
+    """
+    Create a shapely Polygon from a double tuple box
+    """
+    minx, miny = double_tuple_box[0]
+    maxx, maxy = double_tuple_box[1]
+    return geometry.box(minx, miny, maxx, maxy)

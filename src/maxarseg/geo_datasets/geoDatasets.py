@@ -122,7 +122,7 @@ class MxrSingleTileNoEmpty(RasterDataset):
     
     filename_glob = "*.tif"
     is_image = True
-    def __init__(self, paths):
+    def __init__(self, paths, tile_aoi_gdf):
         super().__init__(paths)
         with rio.open(self.files[0]) as src:
             self.to_index = src.index
@@ -130,8 +130,10 @@ class MxrSingleTileNoEmpty(RasterDataset):
             self.transform = src.transform
             self.tile_shape = (src.height, src.width)
         
-        self.tile_aoi = samplers_utils.path_2_tile_aoi(self.files[0])
-        self.aoi_mask = rasterize([self.tile_aoi], out_shape = self.tile_shape, fill=False, default_value=True, transform = self.transform)
+        
+        self.tile_aoi_gdf = tile_aoi_gdf
+        #here tile aoi must be in proj crs
+        self.aoi_mask = rasterize(self.tile_aoi_gdf.geometry, out_shape = self.tile_shape, fill=False, default_value=True, transform = self.transform)
     
     def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
         """Retrieve image/mask and metadata indexed by query.

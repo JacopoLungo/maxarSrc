@@ -15,6 +15,7 @@ import torchvision
 import geopandas as gpd
 from typing import Tuple
 import matplotlib.pyplot as plt
+from shapely import geometry
 
 #My functions
 from maxarseg.assemble import delimiters, filter, gen_gdf, names
@@ -82,7 +83,7 @@ class Mosaic:
         self.road_num = len(self.road_gdf)
         print(f'Roads in {self.name} mosaic: {self.road_num}')
     
-    def set_build_gdf(self): # FIXME: if no buildings are found, self.build_gdf is None and the program crashes during segmentation
+    def set_build_gdf(self):
         qk_hits = gen_gdf.intersecting_qks(*self.bbox)
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
 
@@ -184,7 +185,7 @@ class Mosaic:
         
         return  glb_tile_tree_boxes, all_logits        
     
-    def detect_trees_tile(self, tile_path, georef = True):
+    def detect_trees_tile(self, tile_path, tile_aoi_gdf, georef = True):
         with rasterio.open(tile_path) as src:
             to_xy = src.xy
             crs = src.crs
@@ -224,8 +225,6 @@ class Mosaic:
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_nms]
         print('nms filtering:', len_bf_nms - len(keep_ix_nms), 'boxes removed')
         
-        print('Number of tree boxes after all filtering: ', len(glb_tile_tree_boxes))
-        
         if georef: #create a gdf with the boxes in proj coordinates
             for i, box in enumerate(glb_tile_tree_boxes):
                 #need to invert x and y to go from col row to row col index
@@ -235,11 +234,15 @@ class Mosaic:
                     'geometry': [samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes]}
             
             gdf = gpd.GeoDataFrame(cols, crs = crs)
-            #gdf = gpd.GeoDataFrame(geometry=[samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes], crs = crs)
             
+            if self.event.cross_wlb == True:
+                #keep only tree detections that are inside tile_aoi_gdf
+                gdf = gdf[gdf['geometry'].apply(lambda x: tile_aoi_gdf.intersects(x).any())]
+                print("Not in aoi:", len(glb_tile_tree_scores) - len(gdf), "boxes removed")
+                print('Number of tree boxes after all filtering: ', len(gdf))
             return gdf
-        
-        return glb_tile_tree_boxes #xyxy format, global index
+            
+        return glb_tile_tree_boxes #xyxy format, global (tile) index
 
     def seg_tree_and_build_rnd_samples(self, tile_path, title: str = None, **kwargs):
         if self.build_gdf is None:
@@ -675,16 +678,16 @@ class Mosaic:
         print(f'\nTotal Time for {seg_config.batch_size * (batch_ix + 1)} images: ', time() - start_time_all)
         return canvas
     
-    def seg_glb_tree_and_build_tile_fast(self, tile_path: str ):
+    def seg_glb_tree_and_build_tile_fast(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame):
 
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
         
-        trees_gdf = self.detect_trees_tile(tile_path, georef = True)
+        trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, georef = True)
         
         seg_config = self.event.seg_config
 
-        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
         sampler = samplers.BatchGridGeoSampler(dataset,
                                             batch_size=seg_config.batch_size,
                                             size=seg_config.size,
@@ -740,49 +743,53 @@ class Mosaic:
                                                                     top_lft_indexes = batch['top_lft_index'],
                                                                     )
 
-        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
         return canvas
     
-    def segment_tile(self, tile_path, out_dir_root, overwrite = False, glbl_det= False, separate_masks = True):
+    def segment_tile(self, tile_path, out_dir_root, overwrite = False, separate_masks = True):
         """
         glbl_det: if True tree detection are computed at tile level, if False at patch level
         """
         seg_config = self.event.seg_config
         
-        if self.build_gdf is None:
-            response = self.set_build_gdf()
-            if response == False:
-                return False
-            
-        if self.road_gdf is None:
-            self.set_road_gdf()
-        
+        #create folder if it does not exists
         tile_path = Path(tile_path)
         out_dir_root = Path(out_dir_root)
-                
         out_names = output.gen_names(tile_path, separate_masks)
-
         (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
-        
         if not overwrite:
             for out_name in out_names:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
-        if glbl_det:
-            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path)
-        else:
-            tree_and_build_mask = self.new_seg_tree_and_build_tile(tile_path)
-        
+        #retrieve roads and build at mosaic level if not already done
+        if self.build_gdf is None:
+            response = self.set_build_gdf()
+            if response == False:
+                return False
 
-        thread = threading.Thread(target=self.postprocess_and_save,
-                                    args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks))
+        if self.road_gdf is None:
+            self.set_road_gdf()
+            
+        #TODO: controlla quando il tile non interseca il bordo
+        tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
+        
+        if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
+            print("\nSave an empty mask")
+            thread = threading.Thread(target=self.save_all_blank,
+                                        args=(out_dir_root, tile_path, out_names, separate_masks))
+        
+        else:
+            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf)            
+            
+                
+            thread = threading.Thread(target=self.postprocess_and_save,
+                                        args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks))
         
         thread.start()
-
+        
         return True
-
 
     # function that wraps from postprocessing to be used in a separate thread
     def postprocess_and_save(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks = True):
@@ -799,12 +806,20 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
-        
-        
+    
+    def save_all_blank(self, out_dir_root, tile_path, out_names, separate_masks = True):
+        tile_h, tile_w = samplers_utils.tile_path_2_tile_size(tile_path)
+        masks = np.full((3, tile_h, tile_w), fill_value = False, dtype = bool)
+        output.masks2Tifs(tile_path,
+                        masks,
+                        out_names = out_names,
+                        separate_masks = separate_masks,
+                        out_dir_root = out_dir_root)
+      
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
             start_time = perf_counter()
-            response = self.segment_tile(tile_path, out_dir_root=out_dir_root, glbl_det=True, separate_masks=False)
+            response = self.segment_tile(tile_path, out_dir_root=out_dir_root, separate_masks=False)
             end_time = perf_counter() 
             execution_time = end_time - start_time 
             time_per_tile.append(execution_time)
@@ -813,7 +828,6 @@ class Mosaic:
             if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
                 return time_per_tile, False
         return time_per_tile, True
-
 
 class Event:
     def __init__(self,
@@ -841,6 +855,16 @@ class Event:
         self.bbox = delimiters.get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = names.get_mosaics_names(self.name, self.maxar_root, self.when)
         
+        self.wlb_gdf = gpd.read_file('./metadata/eventi_confini.gpkg')
+        self.filtered_wlb_gdf = self.wlb_gdf[self.wlb_gdf['event names'] == self.name]
+        if self.filtered_wlb_gdf.iloc[0].geometry.is_empty:
+            print('Evento interamente su terra')
+            self.cross_wlb = False
+            self.filtered_wlb_gdf = None
+        else:
+            print('Evento su bordo')
+            self.cross_wlb = True
+
         print(f'Creating event: {self.name}\nRegion: {self.region_name}\nMosaics: {self.all_mosaics_names}')
         #Roads
         self.road_gdf = None
