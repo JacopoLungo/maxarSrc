@@ -121,10 +121,10 @@ class Mosaic:
             road_mask = np.zeros((tile_h, tile_w))
         return road_mask  #shape: (h, w)
     
-    def polyg_road_tile(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def polyg_road_tile(self, tile_aoi_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         road_lines = samplers_utils.filter_road_gdf_vs_aois_gdf(self.proj_road_gdf, tile_aoi_gdf)
         if len(road_lines) != 0:
-            buffered_lines = road_lines.geometry.buffer(seg_config.road_width_mt)
+            buffered_lines = road_lines.geometry.buffer(self.event.seg_config.road_width_mt)
             intersected_buffered_lines_ser = samplers_utils.intersection_road_gdf_vs_aois_gdf(buffered_lines, tile_aoi_gdf)
         else :
             print('No roads')
@@ -789,23 +789,25 @@ class Mosaic:
         
         if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
             print("\nSave an empty mask")
-            thread = threading.Thread(target=self.save_all_blank,
-                                        args=(out_dir_root, tile_path, out_names, separate_masks))
-        
+            # thread = threading.Thread(target=self.save_all_blank,
+            #                             args=(out_dir_root, tile_path, out_names, separate_masks))
+            self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
+
         else:
             tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf)            
-            
-                
-            thread = threading.Thread(target=self.postprocess_and_save,
-                                        args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks))
+            # thread = threading.Thread(target=self.postprocess_and_save,
+            #                             args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks))
         
-        thread.start()
+        # thread.start()
+            self.postprocess_and_save(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks)
         
         return True
 
     # function that wraps from postprocessing to be used in a separate thread
-    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, separate_masks = True):
+    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks = True):
         road_mask = self.seg_road_tile(tile_path)
+        road_gdf = self.polyg_road_tile(tile_aoi_gdf)
+        tree_and_build_mask_copy = tree_and_build_mask.copy()
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)  
         if seg_config.clean_masks_bool:
@@ -818,6 +820,14 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
+        try:
+            output.masks2parquet(tile_path, 
+                                tree_and_build_mask_copy, 
+                                out_dir_root=out_dir_root, 
+                                out_names=out_names, road_series=road_gdf)
+        except Exception as e:
+            print(f'Error in saving parquet: {e}')
+
     
     def save_all_blank(self, out_dir_root, tile_path, out_names, separate_masks = True):
         tile_h, tile_w = samplers_utils.tile_path_2_tile_size(tile_path)

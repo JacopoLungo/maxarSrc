@@ -73,26 +73,41 @@ def gen_names(tile_path, separate_masks=False):
     
     return out_names
 
-def masks2parquet(tile_path , masks: np.ndarray, out_names: list, out_dir_root = './output/tiff'):
+def masks2parquet(tile_path , tree_build_masks: np.ndarray, road_series: pd.Series, out_names: list, out_dir_root = './output/tiff'):
     with rasterio.open(tile_path) as src:
         out_meta = src.meta.copy()
         # convert no_overlap_masks to int
-    tolerances = [0.001, 0.001, 0.001]
-    no_overlap_masks_int = masks.astype(np.uint8)
+    tolerances = [0.001, 0.005]
+    pixel_thresholds = [20, 20]
     # polygonization
     with rasterio.open(tile_path) as src:
         out_meta = src.meta.copy()
-    gdf_list = []
+    gdf_list = [] 
+    # convert pd.Series to gpd.GeoDataFrame
+    road_gdf = gpd.GeoDataFrame(road_series)
+    # set road_gdf class_id to 0
+    road_gdf['class_id'] = 0
+    # rename the columns
+    road_gdf.columns = ['geometry', 'class_id']
+    gdf_list.append(road_gdf)
     # cicling over the masks channels
-    for i in range(no_overlap_masks_int.shape[0]):
-        if no_overlap_masks_int[i].sum() != 0:
-            gdf = polygonize_with_values(no_overlap_masks_int[i], class_id=i, tolerance=tolerances[i], transform=out_meta['transform'], crs=out_meta['crs'], pixel_threshold=10)
+    for i in range(tree_build_masks.shape[0]):
+        if tree_build_masks[i].sum() != 0:
+            gdf = polygonize_with_values(tree_build_masks[i], class_id=i+1, tolerance=tolerances[i], transform=out_meta['transform'], crs=out_meta['crs'], pixel_threshold=pixel_thresholds[i])
             gdf_list.append(gdf)
+    crs = 'EPSG:32628'  # WGS 84 / UTM zone 28N
+    # Set the CRS of all GeoDataFrames to the same CRS
+    for gdf in gdf_list:
+        gdf.set_geometry('geometry', inplace=True)
+        # gdf.set_crs(crs, inplace=True)
+        gdf = gdf.to_crs(crs)
     # create a single gdf
     gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
     # create gdf_first with the first row of gdf
     assert out_names.__len__() == 1, "Only one output name is allowed for parquet file"
-    out_path = Path(out_dir_root) / out_names[0]
+    # out_names[0] is a PosixPat
+    # concatenate out_dir_root with out_names[0]
+    out_path = out_dir_root / out_names[0]
     # replace '.tif' with '.parquet'
     out_path = out_path.with_suffix('.parquet')
     gdf.to_parquet(out_path)

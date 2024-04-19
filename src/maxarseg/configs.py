@@ -100,10 +100,10 @@ class DetectConfig:
                 BOX_THRESHOLD = 0.15,
                 TEXT_THRESHOLD = 0.30,
                 
-                DF_patch_size = 400,
+                DF_patch_size = 800,
                 DF_patch_overlap = 0.25,
                 DF_box_threshold = 0.1,
-                DF_batch_size = 1,
+                DF_batch_size = 16, 
                 
                 max_area_GD_boxes_mt2 = 6000,
                 min_ratio_GD_boxes_edges = 0.0,

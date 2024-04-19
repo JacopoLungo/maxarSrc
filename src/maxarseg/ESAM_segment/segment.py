@@ -88,7 +88,12 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
                                                                     output_w=input_w)
         
         masks = predicted_logits[0,:,0]#.cpu().detach().numpy() # (num_img, prompt, multi, h, w) -> (max_queries, h, w)
+
         
+        # poly
+        # append to geodataframe
+
+
         if y < num_batch_tree_only or input_points[0, start_idx: end_idx].shape[0] == trees_in_mixed_batch: #only trees
             tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks, dim=0).values)
         elif y > num_batch_tree_only or trees_in_mixed_batch == 0: #only build
