@@ -9,7 +9,7 @@ from maxarseg.geo_datasets import geoDatasets
 from shapely.geometry.polygon import Polygon
 from shapely import geometry
 import rasterio
-
+import pandas as pd
 #from maxarseg import segment
 
 def path_2_tile_aoi(tile_path, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ):
@@ -180,3 +180,49 @@ def double_tuple_box_2_shapely_box(double_tuple_box):
     minx, miny = double_tuple_box[0]
     maxx, maxy = double_tuple_box[1]
     return geometry.box(minx, miny, maxx, maxy)
+
+def road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
+    #Could be usefull but not used
+    num_roads = len(proj_road_gdf)
+    num_hits = np.array([0]*num_roads)
+    in_aoi_roads_gdf = gpd.GeoSeries()
+    for geom in aois_gdf.geometry:
+        intersec_geom = proj_road_gdf.intersection(geom)
+        valid_gdf = intersec_geom[~intersec_geom.is_empty]
+        num_hits = num_hits + (~intersec_geom.is_empty.values)
+        in_aoi_roads_gdf = gpd.GeoSeries(pd.concat([valid_gdf, in_aoi_roads_gdf], ignore_index=True))
+        
+    if any(num_hits > 1):
+        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
+    else:
+        return in_aoi_roads_gdf
+    
+def filter_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
+    num_roads = len(proj_road_gdf)
+    num_hits = np.array([0]*num_roads)
+    for geom in aois_gdf.geometry:
+        hits = proj_road_gdf.intersects(geom)
+        num_hits = num_hits + hits.values
+
+    if any(num_hits > 1):
+        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
+    else:
+        return proj_road_gdf[num_hits == 1]
+    
+
+def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
+    intersected_roads = gpd.GeoSeries()
+    num_roads = len(proj_road_gdf)
+    num_hits = np.array([0]*num_roads)
+    for geom in aois_gdf.geometry:
+        intersec_geom = proj_road_gdf.intersection(geom)
+        valid_gdf = intersec_geom[~intersec_geom.is_empty]
+        num_hits = num_hits + (~intersec_geom.is_empty.values)
+        intersected_roads = gpd.GeoSeries(pd.concat([valid_gdf, intersected_roads], ignore_index=True))
+        
+    if any(num_hits > 1):
+        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
+    else:
+        return intersected_roads
+    
+    

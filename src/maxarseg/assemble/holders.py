@@ -121,6 +121,16 @@ class Mosaic:
             road_mask = np.zeros((tile_h, tile_w))
         return road_mask  #shape: (h, w)
     
+    def polyg_road_tile(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        road_lines = samplers_utils.filter_road_gdf_vs_aois_gdf(self.proj_road_gdf, tile_aoi_gdf)
+        if len(road_lines) != 0:
+            buffered_lines = road_lines.geometry.buffer(seg_config.road_width_mt)
+            intersected_buffered_lines_ser = samplers_utils.intersection_road_gdf_vs_aois_gdf(buffered_lines, tile_aoi_gdf)
+        else :
+            print('No roads')
+            intersected_buffered_lines_ser = gpd.GeoSeries()
+        return intersected_buffered_lines_ser
+    
     def detect_trees_tile_DeepForest(self, tile_path) -> Tuple[np.ndarray, ...]:
         config = self.event.det_config
         if self.DF_model is None:
@@ -817,7 +827,7 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
-      
+
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
             start_time = perf_counter()
