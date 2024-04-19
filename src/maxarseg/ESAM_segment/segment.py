@@ -67,7 +67,7 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
     with torch.no_grad():
         image_embeddings = efficient_sam.get_image_embeddings(original_img_tsr)
 
-    tree_build_mask = torch.full((2, input_h, input_w), float(0), dtype = torch.float32, device = device)
+    tree_build_mask = torch.full((2, input_h, input_w), float('-inf'), dtype = torch.float32, device = device)
     num_batch_tree_only = num_tree_boxes // num_parall_queries
     trees_in_mixed_batch = round(num_parall_queries * (num_tree_boxes/num_parall_queries -  num_tree_boxes // num_parall_queries))
 
@@ -96,6 +96,10 @@ def ESAM_from_inputs_fast(original_img_tsr: torch.Tensor, #b, c, h, w
         else: #trees and build
             tree_build_mask[0] = torch.max(tree_build_mask[0], torch.max(masks[:trees_in_mixed_batch], dim=0).values)
             tree_build_mask[1] = torch.max(tree_build_mask[1], torch.max(masks[trees_in_mixed_batch:], dim=0).values)
+
+    # filter the -inf values to 0 TODO: move outside
+    tree_build_mask[0] = torch.where(tree_build_mask[0] == float('-inf'), torch.tensor(0, dtype = torch.float32, device = device), tree_build_mask[0])
+    tree_build_mask[1] = torch.where(tree_build_mask[1] == float('-inf'), torch.tensor(0, dtype = torch.float32, device = device), tree_build_mask[1])
 
     tree_build_mask = tree_build_mask.cpu().detach().numpy()
     return tree_build_mask #shape (b, masks, h, w)

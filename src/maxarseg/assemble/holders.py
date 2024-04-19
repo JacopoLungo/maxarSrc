@@ -736,11 +736,13 @@ class Mosaic:
             
             canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
                                                                     weights = weights,
-                                                                    patch_masks_b =  np.expand_dims(tree_build_mask, axis=0),
+                                                                    patch_masks_b = np.expand_dims(tree_build_mask, axis=0),
                                                                     top_lft_indexes = batch['top_lft_index'],
                                                                     )
 
-        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0) 
+        canvas_0 = np.divide(canvas[0], weights, out=np.zeros_like(canvas[0]), where=weights!=0) 
+        canvas_1 = np.divide(canvas[1], weights, out=np.zeros_like(canvas[1]), where=weights!=0)
+        canvas = np.stack((canvas_0, canvas_1), axis = 0)
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
         return canvas

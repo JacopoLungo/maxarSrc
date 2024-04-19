@@ -2,6 +2,7 @@ import numpy as np
 from typing import List, Tuple, Union
 from skimage import morphology
 from shapely.geometry import Polygon
+from scipy.signal.windows import tukey
 
 
 def get_input_pts_and_lbs(tree_boxes_b: List, #list of array of shape (query_img_x, 4)
@@ -238,7 +239,11 @@ def write_canvas_geo_window(canvas: np.ndarray,
         np.array: The updated canvas with the patch masks written on it.
     """
     # initialize the window, a 2d array containing a cosine window, of the same size as the patch
-    window = np.outer(np.hanning(patch_masks_b.shape[-1]), np.hanning(patch_masks_b.shape[-1]))
+    # window = np.outer(np.hanning(patch_masks_b.shape[-1]), np.hanning(patch_masks_b.shape[-1]))
+
+    # tukey window
+    window1d = tukey(patch_masks_b.shape[-1], alpha=0.5) # TODO: make it conditional
+    window = np.outer(window1d, window1d)
     
     mask_size = patch_masks_b.shape[-1]
     
@@ -252,8 +257,13 @@ def write_canvas_geo_window(canvas: np.ndarray,
         m_start_x = max(0, -top_left_index[1])
         m_end_y = m_start_y + (c_end_y - c_start_y)
         m_end_x = m_start_x + (c_end_x - c_start_x)
+
+        # if m_start_y != 0 or m_start_x != 0 or m_end_y != mask_size or m_end_x != mask_size:
+        #     pass
                 
-        canvas[:, c_start_y: c_end_y, c_start_x: c_end_x] = canvas[:, c_start_y: c_end_y, c_start_x: c_end_x] + patch_mask[:, m_start_y: m_end_y, m_start_x: m_end_x] * window[m_start_y: m_end_y, m_start_x: m_end_x]
+        canvas[0, c_start_y: c_end_y, c_start_x: c_end_x] = canvas[0, c_start_y: c_end_y, c_start_x: c_end_x] + patch_mask[0, m_start_y: m_end_y, m_start_x: m_end_x] * window[m_start_y: m_end_y, m_start_x: m_end_x]
+        canvas[1, c_start_y: c_end_y, c_start_x: c_end_x] = canvas[1, c_start_y: c_end_y, c_start_x: c_end_x] + patch_mask[1, m_start_y: m_end_y, m_start_x: m_end_x] * window[m_start_y: m_end_y, m_start_x: m_end_x]
+
         weights[c_start_y: c_end_y, c_start_x: c_end_x] = weights[c_start_y: c_end_y, c_start_x: c_end_x] + window[m_start_y: m_end_y, m_start_x: m_end_x]
 
     return canvas, weights
