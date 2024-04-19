@@ -857,7 +857,7 @@ class Event:
         
         self.wlb_gdf = gpd.read_file('./metadata/eventi_confini.gpkg')
         self.filtered_wlb_gdf = self.wlb_gdf[self.wlb_gdf['event names'] == self.name]
-        if self.filtered_wlb_gdf.iloc[0].geometry.is_empty:
+        if self.filtered_wlb_gdf.iloc[0].geometry is None:
             print('Evento interamente su terra')
             self.cross_wlb = False
             self.filtered_wlb_gdf = None
