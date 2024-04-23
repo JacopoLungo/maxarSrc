@@ -405,6 +405,7 @@ class Mosaic:
         Esam_total = 0
         post_proc_total = 0
         start_time_all = time()
+
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
             original_img_tsr = batch['image']
 
@@ -505,7 +506,6 @@ class Mosaic:
                 
         #init TIMERS
         GD_total = build_box_total = Esam_total = post_proc_total = 0
-        
         start_time_all = time()
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader)):
             original_img_tsr = batch['image']
@@ -714,17 +714,20 @@ class Mosaic:
         
         canvas = np.zeros((2,) + samplers_utils.tile_sizes(dataset), dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build
         weights = np.zeros(samplers_utils.tile_sizes(dataset), dtype=np.float32) # dim (h_tile, w_tile)
-        
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
             original_img_tsr = batch['image']
 
             #TREES
             #get the tree boxes in batches and the number of trees for each image
             #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
-            tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
-                                                                proj_gdf = trees_gdf,
-                                                                dataset_res = dataset.res,
-                                                                ext_mt = 0)
+            if len(trees_gdf) == 0:
+                tree_boxes_b = []
+                num_trees4img = [0]
+            else:
+                tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = trees_gdf,
+                                                                    dataset_res = dataset.res,
+                                                                    ext_mt = 0)
             
             #BUILDINGS
             #get the building boxes in batches and the number of buildings for each image
