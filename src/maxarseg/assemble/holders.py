@@ -68,6 +68,7 @@ class Mosaic:
         #Buildings
         self.build_gdf = None
         self.proj_build_gdf = None
+        self.sindex_proj_build_gdf = None
         self.build_num = None
 
         #models
@@ -100,9 +101,9 @@ class Mosaic:
                 return False
                 
         self.proj_build_gdf = self.build_gdf.to_crs(self.crs)
+        self.sindex_proj_build_gdf = self.proj_build_gdf.sindex
         
     def seg_road_tile(self, tile_path) -> np.ndarray:
-        seg_config = self.event.seg_config
         with rasterio.open(tile_path) as src:
             transform = src.transform
             tile_h = src.height
@@ -118,7 +119,7 @@ class Mosaic:
         road_lines = self.proj_road_gdf[self.proj_road_gdf.geometry.intersects(query_bbox_poly)]
 
         if len(road_lines) != 0:
-            buffered_lines = road_lines.geometry.buffer(seg_config.road_width_mt)
+            buffered_lines = road_lines.geometry.buffer(cfg.get('segmentation/roads/road_width_mt'))
             road_mask = rasterize(buffered_lines, out_shape=(tile_h, tile_w), transform=transform)
             road_mask = np.where(aoi_mask, road_mask, False)
         else:
@@ -260,10 +261,10 @@ class Mosaic:
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
         
+        tile_building_gdf = self.proj_build_gdf.iloc[self.sindex_proj_build_gdf.query(samplers_utils.path_2_tile_aoi(tile_path))]
+        
         trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, georef = True)
         
-        seg_config = self.event.seg_config
-
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
         sampler = samplers.BatchGridGeoSampler(dataset,
                                             batch_size=cfg.get('models/esam/bs'),
@@ -288,8 +289,8 @@ class Mosaic:
             #BUILDINGS
             #get the building boxes in batches and the number of buildings for each image
             #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
-            building_boxes_b, num_build4img = detect.get_batch_boxes(batch['bbox'],
-                                                                    proj_gdf = self.proj_build_gdf,
+            building_boxes_b, num_build4img = detect.get_refined_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = tile_building_gdf,
                                                                     dataset_res = dataset.res,
                                                                     ext_mt = cfg.get('detection/buildings/ext_mt_build_box'))
 
@@ -329,7 +330,6 @@ class Mosaic:
         """
         glbl_det: if True tree detection are computed at tile level, if False at patch level
         """
-        seg_config = self.event.seg_config
         
         #create folder if it does not exists
         tile_path = Path(tile_path)
@@ -345,12 +345,12 @@ class Mosaic:
             response = self.set_build_gdf()
             if response == False:
                 return False
-
+            
+        tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
+        
         if self.road_gdf is None:
             self.set_road_gdf()
             
-        #TODO: controlla quando il tile non interseca il bordo
-        tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
         
         if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
             print("\nSave an empty mask")
@@ -364,12 +364,15 @@ class Mosaic:
             #                             args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks))
         
         # thread.start()
-            self.postprocess_and_save(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks)
+            self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, separate_masks)
         
         return True
 
     # function that wraps from postprocessing to be used in a separate thread
+    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, separate_masks = True):
         cfg = self.event.cfg
+        road_mask = self.seg_road_tile(tile_path)
+        road_gdf = self.polyg_road_tile(tile_aoi_gdf)
         tree_and_build_mask_copy = tree_and_build_mask.copy()
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
