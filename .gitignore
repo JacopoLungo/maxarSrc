@@ -162,3 +162,4 @@ outputs/
 
 #gpu memory snapshots
 *.pickle
+data

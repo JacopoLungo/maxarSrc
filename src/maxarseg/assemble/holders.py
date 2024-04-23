@@ -235,11 +235,19 @@ class Mosaic:
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_nms]
         print('nms filtering:', len_bf_nms - len(keep_ix_nms), 'boxes removed')
         
+        if len(glb_tile_tree_boxes.shape) == 1:
+            glb_tile_tree_boxes = np.expand_dims(glb_tile_tree_boxes, axis = 0)
+        if glb_tile_tree_scores.size == 1:
+            glb_tile_tree_scores = np.expand_dims(glb_tile_tree_scores, axis = 0)
+
         if georef: #create a gdf with the boxes in proj coordinates
             for i, box in enumerate(glb_tile_tree_boxes):
                 #need to invert x and y to go from col row to row col index
-                glb_tile_tree_boxes[i] = np.array(to_xy(box[1], box[0]) + to_xy(box[3], box[2]))
-                
+                try:
+                    glb_tile_tree_boxes[i] = np.array(to_xy(box[1], box[0]) + to_xy(box[3], box[2]))
+                # catch and print 
+                except Exception as e:
+                    print(f'Error in box {i}: {e}')                
             cols = {'score': list(glb_tile_tree_scores),
                     'geometry': [samplers_utils.xyxyBox2Polygon(box) for box in glb_tile_tree_boxes]}
             
@@ -840,6 +848,9 @@ class Mosaic:
 
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
         for tile_path in self.tiles_paths:
+            print('')
+            print(f'Starting segmenting tile {tile_path}')
+            print('')
             start_time = perf_counter()
             response = self.segment_tile(tile_path, out_dir_root=out_dir_root, separate_masks=False)
             end_time = perf_counter() 
