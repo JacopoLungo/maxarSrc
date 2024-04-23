@@ -139,7 +139,7 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
     result = []
     ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the patch sample extracted from the tile
     #print('\nref_coords top left: ', ref_minx, ref_maxy )
-    for geom in geodf['geometry']:
+    for geom in geodf.geometry:
         minx, miny, maxx, maxy = align_bbox(geom)
         if ext_mt != None or ext_mt != 0:
             minx -= (ext_mt / 2)
@@ -213,16 +213,11 @@ def filter_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
 def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
     intersected_roads = gpd.GeoSeries()
     num_roads = len(proj_road_gdf)
-    num_hits = np.array([0]*num_roads)
     for geom in aois_gdf.geometry:
         intersec_geom = proj_road_gdf.intersection(geom)
         valid_gdf = intersec_geom[~intersec_geom.is_empty]
-        num_hits = num_hits + (~intersec_geom.is_empty.values)
         intersected_roads = gpd.GeoSeries(pd.concat([valid_gdf, intersected_roads], ignore_index=True))
         
-    if any(num_hits > 1):
-        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
-    else:
-        return intersected_roads
+    return intersected_roads
     
     
