@@ -12,7 +12,7 @@ import rasterio
 import pandas as pd
 #from maxarseg import segment
 
-def path_2_tile_aoi(tile_path, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ):
+def path_2_tile_aoi(tile_path, root = './metadata/from_github_maxar_metadata/datasets' ):
     """
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
@@ -34,7 +34,7 @@ def path_2_tile_aoi(tile_path, root = '/nfs/projects/overwatch/maxar-segmentatio
     tile_polyg = shapely.geometry.shape(j)
     return tile_polyg
 
-def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/metadata/from_github/datasets' ) -> List:
+def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = './metadata/from_github_maxar_metadata/datasets' ):
     """
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'

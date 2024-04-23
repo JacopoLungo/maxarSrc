@@ -3,6 +3,7 @@ from pathlib import Path
 from tqdm import tqdm
 import threading
 
+import os
 from time import time, perf_counter
 import numpy as np
 import rasterio
@@ -33,6 +34,9 @@ from groundingdino.util.inference import predict as GD_predict
 
 #Deep forest
 from deepforest import main
+
+#esam
+from maxarseg.efficient_sam.build_efficient_sam import build_efficient_sam_vitt
 
 # Ignore all warnings
 warnings.filterwarnings('ignore')
@@ -104,7 +108,8 @@ class Mosaic:
             tile_h = src.height
             tile_w = src.width
             tile_shape = (tile_h, tile_w)
-        
+            
+        cfg = self.event.cfg
         tile_aoi = samplers_utils.path_2_tile_aoi(tile_path)
         aoi_mask = rasterize([tile_aoi], out_shape = tile_shape, fill=False, default_value=True, transform = transform)
 
@@ -121,10 +126,11 @@ class Mosaic:
             road_mask = np.zeros((tile_h, tile_w))
         return road_mask  #shape: (h, w)
     
-    def polyg_road_tile(self, tile_aoi_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def polyg_road_tile(self, tile_aoi_gdf: gpd.GeoDataFrame) -> gpd.GeoSeries:
+        cfg = self.event.cfg
         road_lines = samplers_utils.filter_road_gdf_vs_aois_gdf(self.proj_road_gdf, tile_aoi_gdf)
         if len(road_lines) != 0:
-            buffered_lines = road_lines.geometry.buffer(self.event.seg_config.road_width_mt)
+            buffered_lines = road_lines.geometry.buffer(cfg.get('segmentation/roads/road_width_mt'))
             intersected_buffered_lines_ser = samplers_utils.intersection_road_gdf_vs_aois_gdf(buffered_lines, tile_aoi_gdf)
         else :
             print('No roads')
@@ -132,18 +138,18 @@ class Mosaic:
         return intersected_buffered_lines_ser
     
     def detect_trees_tile_DeepForest(self, tile_path) -> Tuple[np.ndarray, ...]:
-        config = self.event.det_config
+        cfg = self.event.cfg
         if self.DF_model is None:
-            self.DF_model = main.deepforest(config_args = { 'devices' : config.DF_device,
-                                                    'retinanet': {'score_thresh': config.DF_box_threshold},
+            self.DF_model = main.deepforest(config_args = { 'devices' : cfg.get('models/df/device'),
+                                                    'retinanet': {'score_thresh': cfg.get('models/df/box_threshold')},
                                                     'accelerator': 'cuda',
-                                                    'batch_size': config.DF_batch_size})
+                                                    'batch_size': cfg.get('models/df/bs')})
             self.DF_model.use_release()
         
         boxes_df = self.DF_model.predict_tile(tile_path,
                                     return_plot = False,
-                                    patch_size = config.DF_patch_size,
-                                    patch_overlap = config.DF_patch_overlap)
+                                    patch_size = cfg.get('models/df/size'),
+                                    patch_overlap = cfg.get('models/df/patch_overlap'))
         
         
         boxes = boxes_df.iloc[:, :4].values
@@ -152,14 +158,13 @@ class Mosaic:
         return boxes, score
     
     def detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame) -> Tuple[np.ndarray, np.ndarray]:
-        det_config = self.event.det_config
-        
+        cfg = self.event.cfg
         #load model
-        model = GD_load_model(det_config.CONFIG_PATH, det_config.WEIGHTS_PATH).to(det_config.device)
+        model = GD_load_model(cfg.get('models/gd/config_file_path'), cfg.get('models/gd/weights_path')).to(cfg.get('models/gd/device'))
         print('\n- GD model device:', next(model.parameters()).device)
         
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
-        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=det_config.GD_batch_size, size=det_config.size, stride=det_config.stride)
+        sampler = samplers.BatchGridGeoSampler(dataset, batch_size=cfg.get('models/gd/bs'), size=cfg.get('models/gd/size'), stride=cfg.get('models/gd/stride'))
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
         glb_tile_tree_boxes = torch.empty(0, 4)
@@ -172,12 +177,12 @@ class Mosaic:
                 image_transformed = detect_utils.GD_img_load(img)
                 tree_boxes, logits, phrases = GD_predict(model,
                                                          image_transformed,
-                                                         det_config.TEXT_PROMPT,
-                                                         det_config.BOX_THRESHOLD,
-                                                         det_config.TEXT_THRESHOLD,
-                                                         device = det_config.device)
+                                                         cfg.get('models/gd/text_prompt'),
+                                                         cfg.get('models/gd/box_threshold'),
+                                                         cfg.get('models/gd/text_threshold'),
+                                                         device = cfg.get('models/gd/device'))
                 
-                rel_xyxy_tree_boxes = detect_utils.GDboxes2SamBoxes(tree_boxes, img_shape = det_config.size)
+                rel_xyxy_tree_boxes = detect_utils.GDboxes2SamBoxes(tree_boxes, img_shape = cfg.get('models/gd/size'))
                 top_left_xy = np.array([img_top_left_index[1], #from an index to xyxy
                                         img_top_left_index[0],
                                         img_top_left_index[1],
@@ -191,17 +196,15 @@ class Mosaic:
         
         #del model and free GPU
         del model
-        torch.cuda.empty_cache()
         
-        return  glb_tile_tree_boxes, all_logits        
+        return glb_tile_tree_boxes, all_logits        
     
     def detect_trees_tile(self, tile_path, tile_aoi_gdf, georef = True):
         with rasterio.open(tile_path) as src:
             to_xy = src.xy
             crs = src.crs
             
-        config = self.event.det_config
-        
+        cfg = self.event.cfg
         #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path, tile_aoi_gdf)
         deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
         
@@ -212,24 +215,22 @@ class Mosaic:
         glb_tile_tree_scores = deepForest_scores
         
         print('Number of tree boxes before filtering: ', len(glb_tile_tree_boxes))
-        
-        det_config = self.event.det_config
-        
+                
         keep_ix_box_area = detect_utils.filter_on_box_area_mt2(glb_tile_tree_boxes,
-                                                               max_area_mt2 = det_config.max_area_GD_boxes_mt2,
+                                                               max_area_mt2 = cfg.get('detection/trees/max_area_boxes_mt2'),
                                                                box_format = 'xyxy')
         glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_box_area]
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_box_area]
         print('boxes area filtering: ', len(keep_ix_box_area) - np.sum(keep_ix_box_area), 'boxes removed')
         
         keep_ix_box_ratio = detect_utils.filter_on_box_ratio(glb_tile_tree_boxes,
-                                                             min_edges_ratio = det_config.min_ratio_GD_boxes_edges,
+                                                             min_edges_ratio = cfg.get('detection/trees/min_ratio_GD_boxes_edges'),
                                                              box_format = 'xyxy')
         glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_box_ratio]
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_box_ratio]
         print('box edge ratio filtering:', len(keep_ix_box_ratio) - np.sum(keep_ix_box_ratio), 'boxes removed')
         
-        keep_ix_nms = torchvision.ops.nms(torch.tensor(glb_tile_tree_boxes), torch.tensor(glb_tile_tree_scores), config.nms_threshold)
+        keep_ix_nms = torchvision.ops.nms(torch.tensor(glb_tile_tree_boxes), torch.tensor(glb_tile_tree_scores), cfg.get('detection/trees/nms_threshold'))
         len_bf_nms = len(glb_tile_tree_boxes)
         glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_nms]
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_nms]
@@ -689,7 +690,7 @@ class Mosaic:
         return canvas
     
     def seg_glb_tree_and_build_tile_fast(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame):
-
+        cfg = self.event.cfg
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
         
@@ -699,9 +700,9 @@ class Mosaic:
 
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
         sampler = samplers.BatchGridGeoSampler(dataset,
-                                            batch_size=seg_config.batch_size,
-                                            size=seg_config.size,
-                                            stride=seg_config.stride)
+                                            batch_size=cfg.get('models/esam/bs'),
+                                            size=cfg.get('models/esam/size'),
+                                            stride=cfg.get('models/esam/stride'))
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
         canvas = np.zeros((2,) + samplers_utils.tile_sizes(dataset), dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build
@@ -724,7 +725,7 @@ class Mosaic:
             building_boxes_b, num_build4img = detect.get_batch_boxes(batch['bbox'],
                                                                     proj_gdf = self.proj_build_gdf,
                                                                     dataset_res = dataset.res,
-                                                                    ext_mt = seg_config.ext_mt_build_box)
+                                                                    ext_mt = cfg.get('detection/buildings/ext_mt_build_box'))
 
             if num_trees4img[0] > 0 or num_build4img[0] > 0:
                 
@@ -739,9 +740,9 @@ class Mosaic:
                                                             input_points = torch.from_numpy(input_points),
                                                             input_labels = torch.from_numpy(input_labels),
                                                             num_tree_boxes= num_trees4img,
-                                                            efficient_sam = seg_config.efficient_sam,
-                                                            device = seg_config.device,
-                                                            num_parall_queries = seg_config.ESAM_num_parall_queries)
+                                                            efficient_sam = self.event.efficient_sam,
+                                                            device = cfg.get('models/esam/device'),
+                                                            num_parall_queries = cfg.get('models/esam/num_parall_queries'))
             
             else:
                 #print('no prompts in patch, skipping...')
@@ -802,17 +803,15 @@ class Mosaic:
         return True
 
     # function that wraps from postprocessing to be used in a separate thread
-    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks = True):
-        road_mask = self.seg_road_tile(tile_path)
-        road_gdf = self.polyg_road_tile(tile_aoi_gdf)
+        cfg = self.event.cfg
         tree_and_build_mask_copy = tree_and_build_mask.copy()
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
-        if seg_config.clean_masks_bool:
-            print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
+        if cfg.get('segmentation/general/clean_mask'):
+            print('Cleaning the masks: holes_area_th = ', cfg.get('segmentation/general/rmv_holes_area_th'), 'small_obj_area = ', cfg.get('segmentation/general/rmv_small_obj_area_th'))
             no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
-                                                         area_threshold = seg_config.ski_rmv_holes_area_th,
-                                                         min_size = seg_config.rmv_small_obj_area_th)
+                                                         area_threshold = cfg.get('segmentation/general/rmv_holes_area_th'),
+                                                         min_size = cfg.get('segmentation/general/rmv_small_obj_area_th'))
             print('Mask cleaning done')
 
         output.masks2Tifs(tile_path,
@@ -853,16 +852,16 @@ class Mosaic:
 class Event:
     def __init__(self,
                 name,
-                seg_config: SegmentConfig = None,
-                det_config: DetectConfig = None,
-                when = 'pre', #'pre', 'post', None or 'None'
+                cfg,
                 maxar_root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data',
                 maxar_metadata_path = './metadata/from_github_maxar_metadata/datasets',
                 region = 'infer'):
         #Configs
-        self.seg_config = seg_config
-        self.det_config = det_config
+        self.cfg = cfg
         self.time_per_tile = []
+        
+        #esam
+        self.efficient_sam = build_efficient_sam_vitt(os.path.join(self.cfg.get('models/esam/root_path'), 'weights/efficient_sam_vitt.pt')).to(self.cfg.get('models/esam/device'))        
         
         #Paths
         self.maxar_root = Path(maxar_root)
@@ -871,7 +870,7 @@ class Event:
         
         #Event
         self.name = name
-        self.when = when
+        self.when = cfg.get('event/when')
         self.region_name = names.get_region_name(self.name) if region == 'infer' else region
         self.bbox = delimiters.get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = names.get_mosaics_names(self.name, self.maxar_root, self.when)
