@@ -151,14 +151,14 @@ class Mosaic:
         
         return boxes, score
     
-    def detect_trees_tile_GD(self, tile_path) -> Tuple[np.ndarray, np.ndarray]:
+    def detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame) -> Tuple[np.ndarray, np.ndarray]:
         det_config = self.event.det_config
         
         #load model
         model = GD_load_model(det_config.CONFIG_PATH, det_config.WEIGHTS_PATH).to(det_config.device)
         print('\n- GD model device:', next(model.parameters()).device)
         
-        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path))
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
         sampler = samplers.BatchGridGeoSampler(dataset, batch_size=det_config.GD_batch_size, size=det_config.size, stride=det_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
@@ -202,7 +202,7 @@ class Mosaic:
             
         config = self.event.det_config
         
-        #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path)
+        #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path, tile_aoi_gdf)
         deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
         
         #glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
@@ -712,8 +712,8 @@ class Mosaic:
                                             stride=seg_config.stride)
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
-        canvas = np.full((2,) + samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build, pad
-        weights = np.full(samplers_utils.tile_sizes(dataset), fill_value = float(0) ,dtype=np.float32) # dim (h_tile, w_tile)
+        canvas = np.zeros((2,) + samplers_utils.tile_sizes(dataset), dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build
+        weights = np.zeros(samplers_utils.tile_sizes(dataset), dtype=np.float32) # dim (h_tile, w_tile)
         
         for batch_ix, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
             original_img_tsr = batch['image']
@@ -753,7 +753,7 @@ class Mosaic:
             
             else:
                 #print('no prompts in patch, skipping...')
-                tree_build_mask = np.full((2, *original_img_tsr.shape[2:]), fill_value=float(0)) #(2, h, w)
+                tree_build_mask = np.zeros((2, *original_img_tsr.shape[2:]), dtype = np.float32) #(2, h, w)
             
             canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
                                                                     weights = weights,
@@ -761,9 +761,7 @@ class Mosaic:
                                                                     top_lft_indexes = batch['top_lft_index'],
                                                                     )
 
-        canvas_0 = np.divide(canvas[0], weights, out=np.zeros_like(canvas[0]), where=weights!=0) 
-        canvas_1 = np.divide(canvas[1], weights, out=np.zeros_like(canvas[1]), where=weights!=0)
-        canvas = np.stack((canvas_0, canvas_1), axis = 0)
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
         canvas = np.greater(canvas, 0) #turn logits into bool
         canvas = np.where(dataset.aoi_mask, canvas, False)
         return canvas
@@ -817,12 +815,14 @@ class Mosaic:
         road_gdf = self.polyg_road_tile(tile_aoi_gdf)
         tree_and_build_mask_copy = tree_and_build_mask.copy()
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
-        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)  
+        no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
         if seg_config.clean_masks_bool:
             print('Cleaning the masks: holes_area_th = ', seg_config.ski_rmv_holes_area_th, 'small_obj_area = ', seg_config.rmv_small_obj_area_th)
             no_overlap_masks = segment_utils.clean_masks(no_overlap_masks,
                                                          area_threshold = seg_config.ski_rmv_holes_area_th,
                                                          min_size = seg_config.rmv_small_obj_area_th)
+            print('Mask cleaning done')
+
         output.masks2Tifs(tile_path,
                         no_overlap_masks,
                         out_names = out_names,
@@ -836,10 +836,9 @@ class Mosaic:
         except Exception as e:
             print(f'Error in saving parquet: {e}')
 
-    
     def save_all_blank(self, out_dir_root, tile_path, out_names, separate_masks = True):
         tile_h, tile_w = samplers_utils.tile_path_2_tile_size(tile_path)
-        masks = np.full((3, tile_h, tile_w), fill_value = False, dtype = bool)
+        masks = np.zeros((3, tile_h, tile_w)).astype(bool)
         output.masks2Tifs(tile_path,
                         masks,
                         out_names = out_names,
