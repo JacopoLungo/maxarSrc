@@ -36,14 +36,17 @@ def main():
     print("Selected Event: ", event.name)
     
     all_mosaics_names = event.all_mosaics_names
+    # m0 = event.mosaics[all_mosaics_names[0]] #bay of bengal
     m0 = event.mosaics[all_mosaics_names[0]]
     print("Selected Mosaic: ", m0.name)
     
     land_and_water_tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031231.tif'
     only_water_tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031303.tif'
-    tile_path = m0.tiles_paths[24]
-    print("Selected Tile: ", tile_path)
-    m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False, overwrite = True)
+    
+    #tile_path = m0.tiles_paths[22] #bay of bengal
+    
+    print("Selected Tile: ", land_and_water_tile_path)
+    m0.segment_tile(land_and_water_tile_path, args.out_dir_root, separate_masks = False, overwrite = True)
 
 if __name__ == "__main__":
     main()
