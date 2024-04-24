@@ -12,7 +12,7 @@ import rasterio
 import pandas as pd
 #from maxarseg import segment
 
-def path_2_tile_aoi(tile_path, root = '/nfs/home/innocenti/maxarSrc/metadata/from_github_maxar_metadata/datasets' ):
+def path_2_tile_aoi(tile_path, root = './metadata/from_github_maxar_metadata/datasets' ):
     """
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
@@ -34,7 +34,7 @@ def path_2_tile_aoi(tile_path, root = '/nfs/home/innocenti/maxarSrc/metadata/fro
     tile_polyg = shapely.geometry.shape(j)
     return tile_polyg
 
-def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = '/nfs/home/innocenti/maxarSrc/metadata/from_github_maxar_metadata/datasets' ) -> List:
+def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = './metadata/from_github_maxar_metadata/datasets' ):
     """
     Create a shapely Polygon from a tile_path
     Example of a tile_path: '../Gambia-flooding-8-11-2022/pre/10300100CFC9A500/033133031213.tif'
@@ -139,7 +139,7 @@ def rel_bbox_coords(geodf:gpd.GeoDataFrame,
     result = []
     ref_minx, ref_maxy = ref_coords[0], ref_coords[3] #coords of top left corner of the patch sample extracted from the tile
     #print('\nref_coords top left: ', ref_minx, ref_maxy )
-    for geom in geodf['geometry']:
+    for geom in geodf.geometry:
         minx, miny, maxx, maxy = align_bbox(geom)
         if ext_mt != None or ext_mt != 0:
             minx -= (ext_mt / 2)
@@ -203,26 +203,14 @@ def filter_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
     for geom in aois_gdf.geometry:
         hits = proj_road_gdf.intersects(geom)
         num_hits = num_hits + hits.values
-
-    if any(num_hits > 1):
-        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
-    else:
-        return proj_road_gdf[num_hits == 1]
-    
+    return proj_road_gdf[num_hits >= 1]
 
 def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
     intersected_roads = gpd.GeoSeries()
     num_roads = len(proj_road_gdf)
-    num_hits = np.array([0]*num_roads)
     for geom in aois_gdf.geometry:
         intersec_geom = proj_road_gdf.intersection(geom)
         valid_gdf = intersec_geom[~intersec_geom.is_empty]
-        num_hits = num_hits + (~intersec_geom.is_empty.values)
         intersected_roads = gpd.GeoSeries(pd.concat([valid_gdf, intersected_roads], ignore_index=True))
         
-    if any(num_hits > 1):
-        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
-    else:
-        return intersected_roads
-    
-    
+    return intersected_roads

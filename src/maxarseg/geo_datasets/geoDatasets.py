@@ -11,7 +11,6 @@ from maxarseg.samplers import samplers_utils
 from rasterio.features import rasterize
 
 
-#TODO: pulire il codice sotto dai commenti
 class MxrSingleTile(RasterDataset):
     """
     A dataset for reading a single tile.
@@ -122,7 +121,7 @@ class MxrSingleTileNoEmpty(RasterDataset):
     
     filename_glob = "*.tif"
     is_image = True
-    def __init__(self, paths, tile_aoi_gdf):
+    def __init__(self, paths, tile_aoi_gdf, aoi_mask):
         super().__init__(paths)
         with rio.open(self.files[0]) as src:
             self.to_index = src.index
@@ -133,7 +132,7 @@ class MxrSingleTileNoEmpty(RasterDataset):
         
         self.tile_aoi_gdf = tile_aoi_gdf
         #here tile aoi must be in proj crs
-        self.aoi_mask = rasterize(self.tile_aoi_gdf.geometry, out_shape = self.tile_shape, fill=False, default_value=True, transform = self.transform)
+        self.aoi_mask = aoi_mask
     
     def __getitem__(self, query: BoundingBox) -> dict[str, Any]:
         """Retrieve image/mask and metadata indexed by query.
