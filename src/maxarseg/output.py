@@ -43,7 +43,7 @@ def masks2Tifs(tile_path , masks: np.ndarray, out_names: list, separate_masks: b
     out_meta.update({"driver": "GTiff",
                     "dtype": "uint8",
                     "count": 1})
-    
+    masks = masks.astype(np.uint8)
     for j, out_name in enumerate(out_names):
         out_path = Path(out_dir_root) / out_name
         with rasterio.open(out_path, 'w', **out_meta) as dest:
@@ -95,20 +95,24 @@ def masks2parquet(tile_path , tree_build_masks: np.ndarray, road_series: pd.Seri
         if tree_build_masks[i].sum() != 0:
             gdf = polygonize_with_values(tree_build_masks[i], class_id=i+1, tolerance=tolerances[i], transform=out_meta['transform'], crs=out_meta['crs'], pixel_threshold=pixel_thresholds[i])
             gdf_list.append(gdf)
-    crs = 'EPSG:32628'  # WGS 84 / UTM zone 28N
+    crs = 'EPSG:4326' 
     # Set the CRS of all GeoDataFrames to the same CRS
     for gdf in gdf_list:
         gdf.set_geometry('geometry', inplace=True)
-        # gdf.set_crs(crs, inplace=True)
-        gdf = gdf.to_crs(crs)
-    # create a single gdf
-    gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
-    # create gdf_first with the first row of gdf
-    assert out_names.__len__() == 1, "Only one output name is allowed for parquet file"
-    # out_names[0] is a PosixPat
+        gdf.crs = crs
+    gdf_list = [gdf.to_crs(crs) for gdf in gdf_list if 'geometry' in gdf.columns and gdf['geometry'].notna().all()]
     # concatenate out_dir_root with out_names[0]
     out_path = out_dir_root / out_names[0]
     # replace '.tif' with '.parquet'
     out_path = out_path.with_suffix('.parquet')
+    try:
+        # create a single gdf
+        gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
+        print('Parquet file created at:', out_path)
+    except:
+        print('No GeoDataFrame was created')
+        return None
+    # create gdf_first with the first row of gdf
+    assert out_names.__len__() == 1, "Only one output name is allowed for parquet file"
     gdf.to_parquet(out_path)
     return gdf

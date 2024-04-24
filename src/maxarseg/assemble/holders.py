@@ -831,13 +831,11 @@ class Mosaic:
                         out_names = out_names,
                         separate_masks = separate_masks,
                         out_dir_root = out_dir_root)
-        try:
-            output.masks2parquet(tile_path, 
-                                tree_and_build_mask_copy, 
-                                out_dir_root=out_dir_root, 
-                                out_names=out_names, road_series=road_gdf)
-        except Exception as e:
-            print(f'Error in saving parquet: {e}')
+        
+        output.masks2parquet(tile_path, 
+                            tree_and_build_mask_copy, 
+                            out_dir_root=out_dir_root, 
+                            out_names=out_names, road_series=road_gdf)
 
     def save_all_blank(self, out_dir_root, tile_path, out_names, separate_masks = True):
         tile_h, tile_w = samplers_utils.tile_path_2_tile_size(tile_path)

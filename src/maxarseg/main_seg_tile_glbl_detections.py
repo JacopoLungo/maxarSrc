@@ -94,15 +94,12 @@ def main():
                         det_config = det_config,
                         when=args.when)
     
-    all_mosaics_names = event.all_mosaics_names
+    all_mosaics_names = event.all_mosaics_names    
+    m0 = event.mosaics[all_mosaics_names[0]]
+    tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031213.tif'
     
-    event.seg_all_mosaics(out_dir_root=args.out_dir_root) #this segment all the mosiacs in the event
-    
-    # m0 = event.mosaics[all_mosaics_names[0]]
-    # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
-    
-    # m0_tile_17_path = m0.tiles_paths[17]
-    # tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031213.tif'
+    event.seg_all_mosaics(out_dir_root=args.out_dir_root) 
+    # m0.segment_all_tiles(out_dir_root=args.out_dir_root)
     # m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False)
 
 if __name__ == "__main__":
