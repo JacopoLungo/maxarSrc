@@ -100,7 +100,7 @@ def get_batch_buildings_boxes(batch_bbox: List[BoundingBox], proj_buildings_gdf:
 
     return batch_building_boxes, np.array(num_build4img)
 
-def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 10):
+def get_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoDataFrame, dataset_res, ext_mt = 0):
     """
     Given a batch of bounding boxes in a proj crs, it returns the boxes in the right coordinates relative to the sampled patch. 
     It is necessary that the bbox and the gdf are in the same crs.

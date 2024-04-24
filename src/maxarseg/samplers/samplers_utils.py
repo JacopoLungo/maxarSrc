@@ -203,12 +203,7 @@ def filter_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
     for geom in aois_gdf.geometry:
         hits = proj_road_gdf.intersects(geom)
         num_hits = num_hits + hits.values
-
-    if any(num_hits > 1):
-        raise NotImplementedError("Error: case in which a road is located in more than one area of interest. Not implemented.")
-    else:
-        return proj_road_gdf[num_hits == 1]
-    
+    return proj_road_gdf[num_hits >= 1]
 
 def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
     intersected_roads = gpd.GeoSeries()
@@ -219,5 +214,3 @@ def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
         intersected_roads = gpd.GeoSeries(pd.concat([valid_gdf, intersected_roads], ignore_index=True))
         
     return intersected_roads
-    
-    

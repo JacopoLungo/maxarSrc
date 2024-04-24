@@ -6,6 +6,7 @@ import pandas as pd
 from shapely import geometry
 import json
 from maxarseg import assemble
+import time
 
 def intersecting_qks(bott_left_lon_lat: tuple, top_right_lon_lat: tuple, min_level=7, max_level=9):
     """
@@ -82,7 +83,7 @@ def google_building_gdf(event_name, bbox):
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs=4326)
     gdf_filtered = assemble.filter.filter_gdf_w_bbox(gdf, bbox)
     return gdf_filtered
-    
+
 def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/maxar-segmentation/microsoft-roads'):
     #TODO: cercare di velocizzare la lettura dei dati delle strade
     """
@@ -91,6 +92,7 @@ def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/maxar
         region_name: Name of the region. Example: 'AfricaWest-Full'
         roads_root: Root directory of the roads datasets
     """
+    start_time = time.time()
     print(f'Roads: reading roads for the whole {region_name} region')
     if region_name[-4:] != '.tsv':
         region_name = region_name + '.tsv'
@@ -112,4 +114,7 @@ def get_region_road_gdf(region_name, roads_root = '/nfs/projects/overwatch/maxar
     #slightly faster
     region_road_df['geometry'] = region_road_df['geometry'].apply(custom_json_loads)
     region_road_gdf = gpd.GeoDataFrame(region_road_df, crs=4326)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time for reading roads: {elapsed_time:.2f} seconds")
     return region_road_gdf

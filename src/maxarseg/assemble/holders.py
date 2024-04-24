@@ -17,6 +17,8 @@ import geopandas as gpd
 from typing import Tuple
 import matplotlib.pyplot as plt
 from shapely import geometry
+import json
+import pandas as pd
 
 #My functions
 from maxarseg.assemble import delimiters, filter, gen_gdf, names
@@ -102,8 +104,9 @@ class Mosaic:
                 
         self.proj_build_gdf = self.build_gdf.to_crs(self.crs)
         self.sindex_proj_build_gdf = self.proj_build_gdf.sindex
-        
-    def seg_road_tile(self, tile_path) -> np.ndarray:
+    
+    # Method no more used  
+    def seg_road_tile(self, tile_path, aoi_mask) -> np.ndarray:
         with rasterio.open(tile_path) as src:
             transform = src.transform
             tile_h = src.height
@@ -111,10 +114,8 @@ class Mosaic:
             tile_shape = (tile_h, tile_w)
             
         cfg = self.event.cfg
-        tile_aoi = samplers_utils.path_2_tile_aoi(tile_path)
-        aoi_mask = rasterize([tile_aoi], out_shape = tile_shape, fill=False, default_value=True, transform = transform)
+        #aoi_mask = rasterize(tile_aoi_gdf.geometry, out_shape = tile_shape, fill=False, default_value=True, transform = transform)
 
-            #out_meta = src.meta.copy()
         query_bbox_poly = samplers_utils.path_2_tile_aoi(tile_path)
         road_lines = self.proj_road_gdf[self.proj_road_gdf.geometry.intersects(query_bbox_poly)]
 
@@ -256,7 +257,7 @@ class Mosaic:
             
         return glb_tile_tree_boxes #xyxy format, global (tile) index
     
-    def seg_glb_tree_and_build_tile_fast(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame):
+    def seg_glb_tree_and_build_tile_fast(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask: np.ndarray):
         cfg = self.event.cfg
         if self.build_gdf is None: #set buildings at mosaic level
             self.set_build_gdf()
@@ -265,7 +266,7 @@ class Mosaic:
         
         trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, georef = True)
         
-        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf, aoi_mask)
         sampler = samplers.BatchGridGeoSampler(dataset,
                                             batch_size=cfg.get('models/esam/bs'),
                                             size=cfg.get('models/esam/size'),
@@ -323,7 +324,7 @@ class Mosaic:
 
         canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
         canvas = np.greater(canvas, 0) #turn logits into bool
-        canvas = np.where(dataset.aoi_mask, canvas, False)
+        canvas = np.where(aoi_mask, canvas, False)
         return canvas
     
     def segment_tile(self, tile_path, out_dir_root, overwrite = False, separate_masks = True):
@@ -340,39 +341,60 @@ class Mosaic:
             for out_name in out_names:
                 assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
         
-        #retrieve roads and build at mosaic level if not already done
-        if self.build_gdf is None:
-            response = self.set_build_gdf()
-            if response == False:
-                return False
             
         tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
-        
-        if self.road_gdf is None:
-            self.set_road_gdf()
-            
         
         if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
             print("\nSave an empty mask")
             # thread = threading.Thread(target=self.save_all_blank,
             #                             args=(out_dir_root, tile_path, out_names, separate_masks))
             self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
+            #TODO: come viene gestita la creazione di poligoni su tile compeltamente vuoti?
 
         else:
-            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf)            
+            #retrieve roads and build at mosaic level if not already done
+            if self.build_gdf is None:
+                response = self.set_build_gdf()
+                if response == False:
+                    return False
+            if self.road_gdf is None:
+                self.set_road_gdf()
+            with rasterio.open(tile_path) as src:
+                transform = src.transform
+                tile_shape = (src.height, src.width)
+            aoi_mask = rasterize(tile_aoi_gdf.geometry, out_shape = tile_shape, fill=False, default_value=True, transform = transform)
+            
+            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf, aoi_mask)            
             # thread = threading.Thread(target=self.postprocess_and_save,
             #                             args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks))
         
         # thread.start()
-            self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, separate_masks)
+            self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks)
         
         return True
-
-    # function that wraps from postprocessing to be used in a separate thread
-    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, separate_masks = True):
+    #TODO: not working but should be faster
+    def seg_and_poly_road_tile(self, tile_path, tile_aoi_gdf):
         cfg = self.event.cfg
-        road_mask = self.seg_road_tile(tile_path)
-        road_gdf = self.polyg_road_tile(tile_aoi_gdf)
+        with rasterio.open(tile_path) as src:
+            transform = src.transform
+            tile_h = src.height
+            tile_w = src.width
+        
+        intersected_buffered_lines_ser = self.polyg_road_tile(tile_aoi_gdf)
+        if len(intersected_buffered_lines_ser) != 0:
+            road_mask = rasterize(intersected_buffered_lines_ser, out_shape=(tile_h, tile_w), transform=transform)
+        else: #no roads
+            print('No roads')
+            road_mask = np.zeros((tile_h, tile_w)) 
+        
+        return road_mask, intersected_buffered_lines_ser 
+    
+    # function that wraps from postprocessing to be used in a separate thread
+    def postprocess_and_save(self, tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks = True):
+        cfg = self.event.cfg
+        road_mask = self.seg_road_tile(tile_path, aoi_mask)
+        road_series = self.polyg_road_tile(tile_aoi_gdf)
+        #road_mask, road_series = self.seg_and_poly_road_tile(tile_path, tile_aoi_gdf)
         tree_and_build_mask_copy = tree_and_build_mask.copy()
         overlap_masks = np.concatenate((np.expand_dims(road_mask, axis=0), tree_and_build_mask) , axis = 0)
         no_overlap_masks = segment_utils.rmv_mask_overlap(overlap_masks)
@@ -392,7 +414,7 @@ class Mosaic:
             output.masks2parquet(tile_path, 
                                 tree_and_build_mask_copy, 
                                 out_dir_root=out_dir_root, 
-                                out_names=out_names, road_series=road_gdf)
+                                out_names=out_names, road_series = road_series)
         except Exception as e:
             print(f'Error in saving parquet: {e}')
 
@@ -472,6 +494,49 @@ class Event:
     def set_road_gdf(self): #set road_gdf for the event
         region_road_gdf = gen_gdf.get_region_road_gdf(self.region_name)
         self.road_gdf = filter.filter_gdf_w_bbox(region_road_gdf, self.bbox)
+    
+    def fast_set_road_gdf(self, roads_root = '/nfs/projects/overwatch/maxar-segmentation/microsoft-roads'):
+        """
+        Get a gdf containing the roads of a region.
+        Input:
+            region_name: Name of the region. Example: 'AfricaWest-Full'
+            roads_root: Root directory of the roads datasets
+        """
+        start_time = time.time()
+        print(f'Roads: reading roads for the whole {self.region_name} region')
+        if self.region_name[-4:] != '.tsv':
+            region_name = self.region_name + '.tsv'
+        
+        def custom_json_loads(s):
+            try:
+                return geometry.shape(json.loads(s)['geometry'])
+            except:
+                return geometry.LineString()
+
+        chunksize = 100_000
+        
+        (minx, miny), (maxx, maxy) = self.bbox
+        vertices = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny)] #lon lat
+        query_bbox_poly = geometry.Polygon(vertices)
+
+        roads_root = Path(roads_root)
+        if region_name != 'USA.tsv':
+            print('Roads: not in USA. Region name:', region_name)
+            for chunk in pd.read_csv(roads_root/region_name, names=['country', 'geometry'], sep='\t', chunksize=chunksize):
+                hits = gbl_gdf.sindex.query(query_bbox_poly)
+                gbl_gdf[hits]
+            #region_road_df = pd.read_csv(roads_root/region_name, names =['country', 'geometry'], sep='\t')
+        else:
+            print('is USA:', region_name)
+            region_road_df = pd.read_csv(roads_root/region_name, names =['geometry'], sep='\t')
+        #region_road_df['geometry'] = region_road_df['geometry'].apply(json.loads).apply(lambda d: geometry.shape(d.get('geometry')))
+        #slightly faster
+        region_road_df['geometry'] = region_road_df['geometry'].apply(custom_json_loads)
+        region_road_gdf = gpd.GeoDataFrame(region_road_df, crs=4326)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Elapsed time for reading roads: {elapsed_time:.2f} seconds")
+        return region_road_gdf
 
     def set_mos_road_gdf(self, mosaic_name): #set road_gdf for the mosaic
         if self.road_gdf is None:
