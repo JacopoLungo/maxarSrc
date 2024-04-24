@@ -798,17 +798,17 @@ class Mosaic:
         
         if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
             print("\nSave an empty mask")
-            # thread = threading.Thread(target=self.save_all_blank,
-            #                             args=(out_dir_root, tile_path, out_names, separate_masks))
-            self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
+            thread = threading.Thread(target=self.save_all_blank,
+                                        args=(out_dir_root, tile_path, out_names, separate_masks))
+            #self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
 
         else:
             tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf)            
-            # thread = threading.Thread(target=self.postprocess_and_save,
-            #                             args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks))
-        
-        # thread.start()
-            self.postprocess_and_save(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks)
+            thread = threading.Thread(target=self.postprocess_and_save,
+                                        args=(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks))
+            #self.postprocess_and_save(tree_and_build_mask, out_dir_root, seg_config, tile_path, out_names, tile_aoi_gdf, separate_masks)
+
+        thread.start()
         
         return True
 

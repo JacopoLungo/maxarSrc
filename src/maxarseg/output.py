@@ -105,13 +105,9 @@ def masks2parquet(tile_path , tree_build_masks: np.ndarray, road_series: pd.Seri
     out_path = out_dir_root / out_names[0]
     # replace '.tif' with '.parquet'
     out_path = out_path.with_suffix('.parquet')
-    try:
-        # create a single gdf
-        gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
-        print('Parquet file created at:', out_path)
-    except:
-        print('No GeoDataFrame was created')
-        return None
+    # create a single gdf
+    gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
+    print('Parquet file created at:', out_path)
     # create gdf_first with the first row of gdf
     assert out_names.__len__() == 1, "Only one output name is allowed for parquet file"
     gdf.to_parquet(out_path)
