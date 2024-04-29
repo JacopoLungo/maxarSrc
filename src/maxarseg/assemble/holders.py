@@ -61,6 +61,15 @@ class Mosaic:
         self.when = list((self.event.maxar_root / self.event.name).glob('**/*'+self.name))[0].parts[-2]
         self.tiles_paths = list((self.event.maxar_root / self.event.name / self.when / self.name).glob('*.tif'))
         self.tiles_num = len(self.tiles_paths)
+        
+        #Check if img is bw
+        with rasterio.open(self.tiles_paths[0]) as src:
+            num_bands = src.count
+        if num_bands == 1:
+            print(f'Image {self.tiles_paths[0]} is in black and white', )
+            self.is_rgb = False
+        else:
+            self.is_rgb = True
 
         #Roads
         self.road_gdf = None
@@ -593,10 +602,16 @@ class Event:
     def seg_all_mosaics(self, out_dir_root):
         mos_count = 1
         for __, mosaic in self.mosaics.items():
-            print(f"Start segmenting mosaic: {mosaic.name}, ({mos_count}/{len(self.mosaics)})")
-            times, response = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
-            self.time_per_tile.extend(times)
-            mos_count += 1
-            if response == False:
-                print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
-                continue  
+            if mosaic.is_rgb:
+                print(f"Start segmenting mosaic: {mosaic.name}, ({mos_count}/{len(self.mosaics)})")
+                times, response = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
+                self.time_per_tile.extend(times)
+                mos_count += 1
+                if response == False:
+                    print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
+                    continue
+            else:
+                print(f"First image of mosaic {mosaic.name} is not rgb, we assume the whole mosaic is not rgb. Skipping it...")
+                mos_count += 1
+                self.segmented_tiles += mosaic.tiles_num
+                continue
