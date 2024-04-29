@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH --job-name=maxar
+#SBATCH --gres=gpu:1
+#SBATCH -p RTX
+#SBATCH --time=168:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH -o logs/%j_slurm_logs/output.log
+#SBATCH -e logs/%j_slurm_logs/error.log
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=telegram:378097923
+#SBATCH --mem=10G
+
+
+source .venv/bin/activate
+python -B -O -m maxarseg.main_seg_tile_glbl_detections \
+        --event_ix 3 \
+        --when pre \
+        --bs_det 1 \
+        --size_det 600 \
+        --stride_det 400 \
+        --device_det cuda:0 \
+        --text_prompt "bush" \
+        --box_threshold 0.12 \
+        --text_threshold 0.30 \
+        --max_area_GD_boxes_mt2 6000 \
+        --min_ratio_GD_boxes_edges 0.5 \
+        --perc_reduce_tree_boxes 0.2 \
+        --bs_seg 2 \
+        --device_seg cuda:0 \
+        --size_seg 1024 \
+        --stride_seg 768 \
+        --ext_mt_build_box 0 \
+        --road_width_mt 5 \
+        --ESAM_num_parall_queries 4 \
+        --out_dir_root "./output/tiff/test"

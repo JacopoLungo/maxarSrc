@@ -290,7 +290,7 @@ class Mosaic:
             #get the tree boxes in batches and the number of trees for each image
             #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
             if len(trees_gdf) == 0:
-                tree_boxes_b = []
+                tree_boxes_b = [np.empty((0, 4))]
                 num_trees4img = [0]
             else:
                 tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
@@ -360,7 +360,7 @@ class Mosaic:
             thread = threading.Thread(target=self.save_all_blank,
                                         args=(out_dir_root, tile_path, out_names, separate_masks))
             #self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
-
+        
         else:
             #retrieve roads and build at mosaic level if not already done
             if self.build_gdf is None:

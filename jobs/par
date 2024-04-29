@@ -1,0 +1,27 @@
+for n in {0..7}
+do
+  scommand="sbatch -J maxar_$n jobs/1g $n"
+  echo "submit command: $scommand"
+  $scommand
+done
+
+for n in {8..15}
+do
+  scommand="sbatch -J maxar_$n jobs/a100 $n"
+  echo "submit command: $scommand"
+  $scommand
+done
+
+for n in {16..25}
+do
+  scommand="sbatch -J maxar_$n jobs/3g $n"
+  echo "submit command: $scommand"
+  $scommand
+done
+
+for n in {17396..17415}
+do
+  scommand="scancel $n"
+  echo "submit command: $scommand"
+  $scommand
+done

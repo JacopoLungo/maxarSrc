@@ -9,7 +9,7 @@ torch.set_float32_matmul_precision('medium')
 
 def main(): 
     parser = argparse.ArgumentParser(description='Segment Maxar Tiles')
-    parser.add_argument('--config', required=True type = str, help='Path to the custom configuration file')
+    parser.add_argument('--config', required=True, type = str, help='Path to the custom configuration file')
     parser.add_argument('--event_ix', type = int, help='Index of the event in the list events_names')
     parser.add_argument('--out_dir_root', help='output directory root')
 
@@ -36,14 +36,12 @@ def main():
     print("Selected Event: ", event.name)
     
     all_mosaics_names = event.all_mosaics_names
-    event.seg_all_mosaics(out_dir_root=cfg.get('output/out_dir_root')) #this segment all the mosiacs in the event
-    
-    # m0 = event.mosaics[all_mosaics_names[0]]
+    m0 = event.mosaics[all_mosaics_names[1]]
+    tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/pakistan-flooding22/pre/104001005981D000/031133320001.tif'
+
+    # event.seg_all_mosaics(out_dir_root=cfg.get('output/out_dir_root'))
     # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
-    
-    # m0_tile_17_path = m0.tiles_paths[17]
-    # tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/Gambia-flooding-8-11-2022/pre/105001002BD68F00/033133031213.tif'
-    # m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False)
+    m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False)
 
 if __name__ == "__main__":
     main()

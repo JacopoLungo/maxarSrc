@@ -95,7 +95,7 @@ def masks2parquet(tile_path , tree_build_masks: np.ndarray, road_series: pd.Seri
         if tree_build_masks[i].sum() != 0:
             gdf = polygonize_with_values(tree_build_masks[i], class_id=i+1, tolerance=tolerances[i], transform=out_meta['transform'], crs=out_meta['crs'], pixel_threshold=pixel_thresholds[i])
             gdf_list.append(gdf)
-    crs = 'EPSG:4326' 
+    crs = out_meta['crs']
     # Set the CRS of all GeoDataFrames to the same CRS
     for gdf in gdf_list:
         gdf.set_geometry('geometry', inplace=True)

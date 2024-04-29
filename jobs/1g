@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --job-name=maxar.1g
+#SBATCH --gres=gpu:1g.20gb:1
+#SBATCH -p A100
+#SBATCH --time=168:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH -o logs/%j_slurm_logs/output.log
+#SBATCH -e logs/%j_slurm_logs/error.log
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=telegram:378097923
+#SBATCH --mem=20G
+
+
+source .venv/bin/activate
+python -B -O -m maxarseg.main_seg_event_w_config \
+        --out_dir_root "./output/25_04" \
+        --config "./configs/custom_cfg.yaml" \
+        --event_ix $1
