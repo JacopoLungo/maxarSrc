@@ -209,4 +209,6 @@ class Config(object):
 
         # Set the value to the last key in the path
         sub_dict[path_items[-1]] = value
-        
+    
+    def __str__(self) -> str:
+        return str(self._data)

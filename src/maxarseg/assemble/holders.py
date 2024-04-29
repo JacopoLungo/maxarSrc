@@ -159,13 +159,13 @@ class Mosaic:
         
         return boxes, score
     
-    def detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    def detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask) -> Tuple[np.ndarray, np.ndarray]:
         cfg = self.event.cfg
         #load model
-        model = GD_load_model(cfg.get('models/gd/config_file_path'), cfg.get('models/gd/weights_path')).to(cfg.get('models/gd/device'))
+        model = GD_load_model(cfg.get('models/gd/config_file_path'), cfg.get('models/gd/weight_path')).to(cfg.get('models/gd/device'))
         print('\n- GD model device:', next(model.parameters()).device)
         
-        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf)
+        dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf, aoi_mask=aoi_mask)
         sampler = samplers.BatchGridGeoSampler(dataset, batch_size=cfg.get('models/gd/bs'), size=cfg.get('models/gd/size'), stride=cfg.get('models/gd/stride'))
         dataloader = DataLoader(dataset , batch_sampler=sampler, collate_fn=stack_samples)
         
@@ -207,6 +207,7 @@ class Mosaic:
             crs = src.crs
             
         cfg = self.event.cfg
+        #TODO: add aoi_mask in the args if you want to use GD
         #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path, tile_aoi_gdf)
         deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
         
@@ -439,9 +440,10 @@ class Mosaic:
                         out_dir_root = out_dir_root)
 
     def segment_all_tiles(self, out_dir_root, time_per_tile = []):
+        mos_seg_tile = 1
         for tile_path in self.tiles_paths:
             print('')
-            print(f'Starting segmenting tile {tile_path}')
+            print(f'Starting segmenting tile {tile_path}, ({mos_seg_tile}/{self.tiles_num}), ({self.event.segmented_tiles}/{self.event.total_tiles})')
             print('')
             start_time = perf_counter()
             response = self.segment_tile(tile_path, out_dir_root=out_dir_root, separate_masks=False)
@@ -450,6 +452,8 @@ class Mosaic:
             time_per_tile.append(execution_time)
             print(f'Finished segmenting tile {tile_path} in {execution_time:.2f} seconds')
             print(f'Average time per tile: {np.mean(time_per_tile):.2f} seconds')
+            self.event.segmented_tiles += 1
+            mos_seg_tile += 1
             if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
                 return time_per_tile, False
         return time_per_tile, True
@@ -500,6 +504,9 @@ class Event:
         #Init mosaics
         for m_name in self.all_mosaics_names:
             self.mosaics[m_name] = Mosaic(m_name, self)
+        
+        self.total_tiles = sum([mosaic.tiles_num for mosaic in self.mosaics.values()])
+        self.segmented_tiles = 1
 
     def set_seg_config(self, seg_config):
         self.seg_config = seg_config
@@ -584,9 +591,12 @@ class Event:
 
     #Segment methods
     def seg_all_mosaics(self, out_dir_root):
+        mos_count = 1
         for __, mosaic in self.mosaics.items():
+            print(f"Start segmenting mosaic: {mosaic.name}, ({mos_count}/{len(self.mosaics)})")
             times, response = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
             self.time_per_tile.extend(times)
+            mos_count += 1
             if response == False:
                 print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
                 continue  
