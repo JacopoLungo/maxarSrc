@@ -356,9 +356,10 @@ class Mosaic:
         tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
         
         if tile_aoi_gdf.iloc[0].geometry.is_empty: #tile completely on water
-            print("\nSave an empty mask")
-            thread = threading.Thread(target=self.save_all_blank,
-                                        args=(out_dir_root, tile_path, out_names, separate_masks))
+            pass
+            # print("\nSave an empty mask")
+            # thread = threading.Thread(target=self.save_all_blank,
+            #                             args=(out_dir_root, tile_path, out_names, separate_masks))
             #self.save_all_blank(out_dir_root, tile_path, out_names, separate_masks)
         
         else:
@@ -379,7 +380,7 @@ class Mosaic:
                                         args=(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask,separate_masks))
         
             thread.start()
-            #self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks)
+            # self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks)
         
         return True
     #TODO: not working but should be faster

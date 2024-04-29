@@ -134,7 +134,11 @@ def get_refined_batch_boxes(batch_bbox: List[BoundingBox], proj_gdf: gpd.GeoData
         raise ValueError("Invalid input: batch_bbox should contain exactly one bounding box (segmentation batch size must be 1)")
     bbox = batch_bbox[0]    
     query_patch_poly = samplers_utils.boundingBox_2_Polygon(bbox) #from patch bbox to polygon
-    intersec_geom = proj_gdf.intersection(query_patch_poly)
+    try:
+        intersec_geom = proj_gdf.intersection(query_patch_poly)
+    except Exception as e:
+        proj_gdf['geometry'] = proj_gdf['geometry'].apply(lambda geom: geom.buffer(0) if not geom.is_valid else geom)
+        intersec_geom = proj_gdf.intersection(query_patch_poly)
     valid_gdf = intersec_geom[~intersec_geom.is_empty]
     num_boxes4img = [len(valid_gdf)]
     if len(valid_gdf) > 0:
