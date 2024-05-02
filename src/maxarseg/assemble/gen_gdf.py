@@ -7,6 +7,8 @@ from shapely import geometry
 import json
 from maxarseg import assemble
 import time
+from shapely.wkt import loads
+
 
 def intersecting_qks(bott_left_lon_lat: tuple, top_right_lon_lat: tuple, min_level=7, max_level=9):
     """
@@ -80,6 +82,7 @@ def google_building_gdf(event_name, bbox):
     f_name = 'open_buildings_v3_'+ event_name + '.csv'
     file_path = Path(root) / f_name
     df = pd.read_csv(file_path) #TODO: leggere solo le colonne necessarie e filtrare magari su confidence boxes
+    df['geometry'] = df['geometry'].apply(loads)
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs=4326)
     gdf_filtered = assemble.filter.filter_gdf_w_bbox(gdf, bbox)
     return gdf_filtered
