@@ -7,10 +7,57 @@ from typing import Optional, Union
 from collections.abc import Iterator
 import torch
 import math
+from maxarseg.geo_datasets import geoDatasets
 
+class SinglePatchSampler:
+    """
+    To be used with SingleTileDataset
+    Sample a single patch from a dataset.
+    """
+    def __init__(self, dataset, patch_size, stride):
+        self.dataset = dataset
+        assert patch_size > 0
+        self.patch_size = patch_size #pxl
+        if dataset.transform[0] != -dataset.transform[4]:
+            raise ValueError("The pixel scale in x and y directions are different.")
+        self.patch_size_meters = patch_size * dataset.transform[0]
+        
+        assert stride > 0
+        self.stride = stride #pxl
+        if self.stride is None:
+            self.stride = self.patch_size
+        self.stride_meters = self.stride * dataset.transform[0]
+    
+    def tile_to_chips(self) -> tuple[int, int]:
+        rows = math.ceil((self.dataset.height - self.patch_size) / self.stride) + 1
+        cols = math.ceil((self.dataset.width - self.patch_size) / self.stride) + 1
+        return rows, cols
+        
+    def __iter__(self):
+        rows, cols = self.tile_to_chips()
+        discarder_chips = 0
+        for i in range(rows):
+            miny = self.dataset.bounds.bottom + i * self.stride_meters
+            maxy = miny + self.patch_size_meters
+
+            # For each column...
+            for j in range(cols):
+                minx = self.dataset.bounds.left + j * self.stride_meters
+                maxx = minx + self.patch_size_meters
+                selected_bbox = geoDatasets.noTBoundingBox(minx, maxx, miny, maxy)
+                selected_bbox_polygon = boundingBox_2_Polygon(selected_bbox)
+                if self.dataset.tile_aoi_gdf.intersects(selected_bbox_polygon).any():
+                    yield (minx, maxx, miny, maxy)
+                else:
+                    discarder_chips += 1
+                    continue
+        print('Discarded empty chips: ', discarder_chips)
+        print('True num of batch: ', len(self) - discarder_chips)         
+
+    def __len__(self) -> int:
+        return self.tile_to_chips()[0]*self.tile_to_chips()[1]
 
 # Samplers per Base Datasets
-
 class MyRandomGeoSampler(RandomGeoSampler):
     """
     Sample a single random bounding box from a dataset (does NOT support batches).

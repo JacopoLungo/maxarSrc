@@ -4,6 +4,7 @@ from tqdm import tqdm
 import threading
 
 import os
+import sys
 from time import time, perf_counter
 import numpy as np
 import rasterio
@@ -168,6 +169,49 @@ class Mosaic:
         
         return boxes, score
     
+    def noTGeo_detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask) -> Tuple[np.ndarray, np.ndarray]:
+        cfg = self.event.cfg
+        #load model
+        model = GD_load_model(cfg.get('models/gd/config_file_path'), cfg.get('models/gd/weight_path')).to(cfg.get('models/gd/device'))
+        print('\n- GD model device:', next(model.parameters()).device)
+        
+        dataset = geoDatasets.SingleTileDataset(str(tile_path), tile_aoi_gdf, aoi_mask)
+        sampler = samplers.SinglePatchSampler(dataset, patch_size=cfg.get('models/esam/size'), stride=cfg.get('models/esam/stride'))
+        dataloader = DataLoader(dataset, sampler=sampler, collate_fn=geoDatasets.single_sample_collate_fn)
+        
+        glb_tile_tree_boxes = torch.empty(0, 4)
+        all_logits = torch.empty(0)
+        
+        for batch in tqdm(dataloader, total = len(dataloader), desc="Detecting Trees with GDino"):
+            img_b = batch['image'].permute(0,2,3,1).numpy().astype('uint8')
+            
+            for img, img_top_left_index in zip(img_b, batch['top_lft_index']):
+                image_transformed = detect_utils.GD_img_load(img)
+                tree_boxes, logits, phrases = GD_predict(model,
+                                                         image_transformed,
+                                                         cfg.get('models/gd/text_prompt'),
+                                                         cfg.get('models/gd/box_threshold'),
+                                                         cfg.get('models/gd/text_threshold'),
+                                                         device = cfg.get('models/gd/device'))
+                
+                rel_xyxy_tree_boxes = detect_utils.GDboxes2SamBoxes(tree_boxes, img_shape = cfg.get('models/gd/size'))
+                top_left_xy = np.array([img_top_left_index[1], #from an index to xyxy
+                                        img_top_left_index[0],
+                                        img_top_left_index[1],
+                                        img_top_left_index[0]])
+                
+                #turn boxes from patch xyxy coords to global xyxy coords
+                glb_xyxy_tree_boxes = rel_xyxy_tree_boxes + top_left_xy
+                
+                glb_tile_tree_boxes = np.concatenate((glb_tile_tree_boxes, glb_xyxy_tree_boxes))
+                all_logits = np.concatenate((all_logits, logits))
+        
+        #del model and free GPU
+        #TODO: if enough space in GPU, keep the model loaded
+        del model
+        
+        return glb_tile_tree_boxes, all_logits  
+    
     def detect_trees_tile_GD(self, tile_path, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask) -> Tuple[np.ndarray, np.ndarray]:
         cfg = self.event.cfg
         #load model
@@ -275,6 +319,76 @@ class Mosaic:
             
         return glb_tile_tree_boxes #xyxy format, global (tile) index
     
+    def noTGeo_seg_glb_tree_and_build_tile(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask: np.ndarray):
+        cfg = self.event.cfg
+        if self.build_gdf is None: #set buildings at mosaic level
+            self.set_build_gdf()
+        
+        tile_building_gdf = self.proj_build_gdf.iloc[self.sindex_proj_build_gdf.query(samplers_utils.path_2_tile_aoi(tile_path))]
+        
+        trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, aoi_mask = aoi_mask, georef = True)
+        
+        dataset = geoDatasets.SingleTileDataset(str(tile_path), tile_aoi_gdf, aoi_mask)
+        sampler = samplers.SinglePatchSampler(dataset, patch_size=cfg.get('models/esam/size'), stride=cfg.get('models/esam/stride'))
+        dataloader = DataLoader(dataset, sampler=sampler, collate_fn=geoDatasets.single_sample_collate_fn)
+        
+        canvas = np.zeros((2,) + dataset.tile_shape, dtype=np.float32) # dim (3, h_tile, w_tile). The dim 0 is: tree, build
+        weights = np.zeros(dataset.tile_shape, dtype=np.float32) # dim (h_tile, w_tile)
+        for _, batch in tqdm(enumerate(dataloader), total = len(dataloader), desc = "Segmenting"):
+            original_img_tsr = batch['image']
+
+            #TREES
+            #get the tree boxes in batches and the number of trees for each image
+            #tree_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di tree boxes
+            if len(trees_gdf) == 0:
+                tree_boxes_b = [np.empty((0, 4))]
+                num_trees4img = [0]
+            else:
+                tree_boxes_b, num_trees4img = detect.get_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = trees_gdf,
+                                                                    dataset_res = dataset.res,
+                                                                    ext_mt = 0)
+            
+            #BUILDINGS
+            #get the building boxes in batches and the number of buildings for each image
+            #building_boxes_b è una lista con degli array di shape (n, 4) dove n è il numero di building boxes
+            building_boxes_b, num_build4img = detect.get_refined_batch_boxes(batch['bbox'],
+                                                                    proj_gdf = tile_building_gdf,
+                                                                    dataset_res = dataset.res,
+                                                                    ext_mt = cfg.get('detection/buildings/ext_mt_build_box'))
+
+            if num_trees4img[0] > 0 or num_build4img[0] > 0:
+                
+                max_detect = max(num_trees4img + num_build4img)
+                
+                #obtain the right input for the ESAM model (trees + buildings)
+                input_points, input_labels = segment_utils.get_input_pts_and_lbs(tree_boxes_b, building_boxes_b, max_detect)
+                
+                # segment the image and get for each image as many masks as the number of boxes,
+                # for GPU constraint use num_parall_queries
+                tree_build_mask = segment.ESAM_from_inputs_fast(original_img_tsr = original_img_tsr,
+                                                            input_points = torch.from_numpy(input_points),
+                                                            input_labels = torch.from_numpy(input_labels),
+                                                            num_tree_boxes= num_trees4img,
+                                                            efficient_sam = self.event.efficient_sam,
+                                                            device = cfg.get('models/esam/device'),
+                                                            num_parall_queries = cfg.get('models/esam/num_parall_queries'))
+            
+            else:
+                #print('no prompts in patch, skipping...')
+                tree_build_mask = np.zeros((2, *original_img_tsr.shape[2:]), dtype = np.float32) #(2, h, w)
+            
+            canvas, weights = segment_utils.write_canvas_geo_window(canvas = canvas,
+                                                                    weights = weights,
+                                                                    patch_masks_b = np.expand_dims(tree_build_mask, axis=0),
+                                                                    top_lft_indexes = batch['top_lft_index'],
+                                                                    )
+
+        canvas = np.divide(canvas, weights, out=np.zeros_like(canvas), where=weights!=0)
+        canvas = np.greater(canvas, 0) #turn logits into bool
+        canvas = np.where(aoi_mask, canvas, False)
+        return canvas
+    
     def seg_glb_tree_and_build_tile_fast(self, tile_path: str, tile_aoi_gdf: gpd.GeoDataFrame, aoi_mask: np.ndarray):
         cfg = self.event.cfg
         if self.build_gdf is None: #set buildings at mosaic level
@@ -282,7 +396,7 @@ class Mosaic:
         
         tile_building_gdf = self.proj_build_gdf.iloc[self.sindex_proj_build_gdf.query(samplers_utils.path_2_tile_aoi(tile_path))]
         
-        trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, georef = True)
+        trees_gdf = self.detect_trees_tile(tile_path, tile_aoi_gdf = tile_aoi_gdf, aoi_mask = aoi_mask, georef = True)
         
         dataset = geoDatasets.MxrSingleTileNoEmpty(str(tile_path), tile_aoi_gdf, aoi_mask)
         sampler = samplers.BatchGridGeoSampler(dataset,
@@ -360,7 +474,7 @@ class Mosaic:
         (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
         if not overwrite:
             for out_name in out_names:
-                assert not (out_dir_root / out_name).exists(), f'File {out_name} already exists'
+                assert not (out_dir_root / out_name).exists(), f'File {out_dir_root / out_name} already exists'
         
             
         tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)

@@ -1,5 +1,6 @@
 from torchgeo.datasets import RasterDataset, IntersectionDataset, BoundingBox
 import torch
+from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
 import os
 from typing import Any, cast
@@ -9,7 +10,48 @@ import sys
 import rasterio as rio
 from maxarseg.samplers import samplers_utils
 from rasterio.features import rasterize
+from rasterio.windows import from_bounds
 
+class noTBoundingBox():
+    def __init__(self, minx, maxx, miny, maxy):
+        self.minx = minx
+        self.maxx = maxx
+        self.miny = miny
+        self.maxy = maxy
+
+def single_sample_collate_fn(batch):
+    sample = batch[0]
+    sample['top_lft_index'] = [sample['top_lft_index']]
+    sample['bbox'] = [sample['bbox']]
+    return sample
+
+class SingleTileDataset(Dataset):
+    """
+    To be used with SinglePatchSampler
+    """
+    def __init__(self, tiff_path, tile_aoi_gdf, aoi_mask):
+        self.tiff_path = tiff_path
+        self.tile_aoi_gdf = tile_aoi_gdf
+        self.aoi_mask = aoi_mask
+        with rio.open(tiff_path) as src:
+            self.to_index = src.index
+            self.to_xy = src.xy
+            self.tile_shape = (src.height, src.width)
+            self.height, self.width = self.tile_shape
+            self.transform = src.transform #pxl to geo
+            self.bounds = src.bounds #geo coords
+            self.res = src.res[0]
+
+    def __getitem__(self, bbox):
+        minx, maxx, miny, maxy = bbox #geo coords
+        with rio.open(self.tiff_path) as dataset:
+            window = from_bounds(minx, miny, maxx, maxy, dataset.transform)
+            patch_data = dataset.read(window=window, boundless=True)
+        patch_tensor = torch.from_numpy(patch_data).float()
+        sample = {'image': patch_tensor.unsqueeze(0), #(1,3,h,w)
+                  'bbox': noTBoundingBox(minx, maxx, miny, maxy),
+                  'top_lft_index': self.to_index(minx, maxy)}
+        return sample
 
 class MxrSingleTile(RasterDataset):
     """
