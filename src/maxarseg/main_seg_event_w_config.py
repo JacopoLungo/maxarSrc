@@ -35,13 +35,12 @@ def main():
     event = holders.Event(events_names[cfg.get('event/ix')], cfg = cfg)
     print("Selected Event: ", event.name)
     
-    all_mosaics_names = event.all_mosaics_names
-    m0 = event.mosaics[all_mosaics_names[0]]
-    tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/southafrica-flooding22/pre/105001002B1CF200/213113323300.tif'
-
-    # event.seg_all_mosaics(out_dir_root=cfg.get('output/out_dir_root'))
-    # m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
-    m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False)
+    #all_mosaics_names = event.all_mosaics_names
+    #m0 = event.mosaics[all_mosaics_names[0]]
+    #tile_path = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/southafrica-flooding22/pre/105001002B1CF200/213113323300.tif'
+    event.seg_all_mosaics(out_dir_root=cfg.get('output/out_dir_root'))
+    #m0.segment_all_tiles(out_dir_root=args.out_dir_root) #this segment all tiles in the mosaic
+    #m0.segment_tile(tile_path, args.out_dir_root, separate_masks = False)
 
 if __name__ == "__main__":
     main()

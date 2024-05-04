@@ -170,5 +170,6 @@ scalene/
 #user dependent jobs
 j_jobs/
 
-
+#test files
 notebooks/to_delete.ipynb
+src/maxarseg/geo_datasets/datasets.py
