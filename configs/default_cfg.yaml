@@ -9,8 +9,8 @@ models:
     stride: 400
     device: "cuda:0"
     root_path: "./models/GDINO"
-    config_file_path: "configs/GroundingDINO_SwinT_OGC.py"
-    weight_path: "weights/groundingdino_swint_ogc.pth"
+    config_file_path: "./models/GDINO/configs/GroundingDINO_SwinT_OGC.py"
+    weight_path: "./models/GDINO/weights/groundingdino_swint_ogc.pth"
     text_prompt: "bush"
     box_threshold: 0.15
     text_threshold: 0.30
@@ -34,7 +34,7 @@ models:
 detection:
   trees:
     nms_threshold: 0.5
-    min_ratio_GD_boxes_edges: 0
+    min_ratio_GD_boxes_edges: 0.5
     max_area_boxes_mt2: 6000
     perc_reduce_tree_boxes: 0
 
