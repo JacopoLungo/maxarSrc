@@ -163,3 +163,12 @@ outputs/
 #gpu memory snapshots
 *.pickle
 data
+
+#scalene profiler outputs
+scalene/
+
+#user dependent jobs
+j_jobs/
+
+
+notebooks/to_delete.ipynb
