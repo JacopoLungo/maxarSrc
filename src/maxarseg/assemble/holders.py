@@ -250,25 +250,31 @@ class Mosaic:
                 all_logits = np.concatenate((all_logits, logits))
         
         #del model and free GPU
+        #TODO: if enough space in GPU, keep the model loaded
         del model
         
         return glb_tile_tree_boxes, all_logits        
     
-    def detect_trees_tile(self, tile_path, tile_aoi_gdf, georef = True):
+    def detect_trees_tile(self, tile_path, tile_aoi_gdf, aoi_mask, georef = True):
         with rasterio.open(tile_path) as src:
             to_xy = src.xy
             crs = src.crs
             
         cfg = self.event.cfg
-        #TODO: add aoi_mask in the args if you want to use GD
-        #GD_glb_tile_tree_boxes, GD_scores = self.detect_trees_tile_GD(tile_path, tile_aoi_gdf)
-        deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
+        if cfg.get('detection/trees/use_DF'):
+            deepForest_glb_tile_tree_boxes, deepForest_scores = self.detect_trees_tile_DeepForest(tile_path)
+        if cfg.get('detection/trees/use_GD'):
+            GD_glb_tile_tree_boxes, GD_scores = self.noTGeo_detect_trees_tile_GD(tile_path, tile_aoi_gdf, aoi_mask)
         
-        #glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
-        #glb_tile_tree_scores = np.concatenate((GD_scores, deepForest_scores))
-        
-        glb_tile_tree_boxes = deepForest_glb_tile_tree_boxes
-        glb_tile_tree_scores = deepForest_scores
+        if cfg.get('detection/trees/use_DF') and cfg.get('detection/trees/use_GD'):
+            glb_tile_tree_boxes = np.concatenate((GD_glb_tile_tree_boxes, deepForest_glb_tile_tree_boxes))
+            glb_tile_tree_scores = np.concatenate((GD_scores, deepForest_scores))
+        elif cfg.get('detection/trees/use_DF'):
+            glb_tile_tree_boxes = deepForest_glb_tile_tree_boxes
+            glb_tile_tree_scores = deepForest_scores
+        elif cfg.get('detection/trees/use_GD'):
+            glb_tile_tree_boxes = GD_glb_tile_tree_boxes
+            glb_tile_tree_scores = GD_scores
         
         print('Number of tree boxes before filtering: ', len(glb_tile_tree_boxes))
                 
@@ -286,7 +292,7 @@ class Mosaic:
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_box_ratio]
         print('box edge ratio filtering:', len(keep_ix_box_ratio) - np.sum(keep_ix_box_ratio), 'boxes removed')
         
-        keep_ix_nms = torchvision.ops.nms(torch.tensor(glb_tile_tree_boxes), torch.tensor(glb_tile_tree_scores), cfg.get('detection/trees/nms_threshold'))
+        keep_ix_nms = torchvision.ops.nms(torch.tensor(glb_tile_tree_boxes), torch.tensor(glb_tile_tree_scores.astype(np.float64)), cfg.get('detection/trees/nms_threshold'))
         len_bf_nms = len(glb_tile_tree_boxes)
         glb_tile_tree_boxes = glb_tile_tree_boxes[keep_ix_nms]
         glb_tile_tree_scores = glb_tile_tree_scores[keep_ix_nms]
@@ -499,12 +505,14 @@ class Mosaic:
                 tile_shape = (src.height, src.width)
             aoi_mask = rasterize(tile_aoi_gdf.geometry, out_shape = tile_shape, fill=False, default_value=True, transform = transform)
             
-            tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf, aoi_mask)            
-            thread = threading.Thread(target=self.postprocess_and_save,
-                                        args=(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask,separate_masks))
+            #tree_and_build_mask = self.seg_glb_tree_and_build_tile_fast(tile_path, tile_aoi_gdf, aoi_mask)            
+            tree_and_build_mask = self.noTGeo_seg_glb_tree_and_build_tile(tile_path, tile_aoi_gdf, aoi_mask)
+            
+            #thread = threading.Thread(target=self.postprocess_and_save,
+            #                            args=(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask,separate_masks))
         
-            thread.start()
-            # self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks)
+            #thread.start()
+            self.postprocess_and_save(tree_and_build_mask, out_dir_root, tile_path, out_names, tile_aoi_gdf, aoi_mask, separate_masks)
         
         return True
     #TODO: not working but should be faster

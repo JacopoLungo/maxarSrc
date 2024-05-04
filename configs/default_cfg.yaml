@@ -33,6 +33,8 @@ models:
   
 detection:
   trees:
+    use_GD: true
+    use_DF: false
     nms_threshold: 0.5
     min_ratio_GD_boxes_edges: 0.5
     max_area_boxes_mt2: 6000
