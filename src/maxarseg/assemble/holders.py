@@ -484,8 +484,10 @@ class Mosaic:
         (out_dir_root / out_names[0]).parent.mkdir(parents=True, exist_ok=True) #create folder if not exists
         if not overwrite:
             for out_name in out_names:
-                assert not (out_dir_root / out_name).exists(), f'File {out_dir_root / out_name} already exists'
-        
+                if (out_dir_root / out_name).exists():
+                    print(f'File {out_dir_root / out_name} already exists')
+                    return True
+                #assert not (out_dir_root / out_name).exists(), f'File {out_dir_root / out_name} already exists'
             
         tile_aoi_gdf = samplers_utils.path_2_tile_aoi_no_water(tile_path, self.event.filtered_wlb_gdf)
         
@@ -583,14 +585,14 @@ class Mosaic:
             start_time = perf_counter()
             response = self.segment_tile(tile_path, out_dir_root=out_dir_root, separate_masks=False)
             end_time = perf_counter() 
+            if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
+                return time_per_tile, False
             execution_time = end_time - start_time 
             time_per_tile.append(execution_time)
             print(f'Finished segmenting tile {tile_path} in {execution_time:.2f} seconds')
             print(f'Average time per tile: {np.mean(time_per_tile):.2f} seconds')
             self.event.segmented_tiles += 1
             mos_seg_tile += 1
-            if response == False: #this means that buildings footprint are not available for the mosaic, go to next mosaic
-                return time_per_tile, False
         return time_per_tile, True
 
 class Event:
