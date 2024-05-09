@@ -4,6 +4,7 @@ import geopandas as gpd
 from typing import List, Tuple, Union
 from maxarseg.assemble import names
 import pyproj
+import glob
 
 def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = './metadata/from_github_maxar_metadata/datasets', extra_mt = 0, return_proj_coords = False):
     """
@@ -20,8 +21,14 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = './metadata/
     path_mosaic_metatada = Path(path_mosaic_metatada)
     file_name = mosaic_name + '.geojson'
     geojson_path = path_mosaic_metatada / event_name / file_name
-    gdf = gpd.read_file(geojson_path)
-
+    try:
+        gdf = gpd.read_file(geojson_path)
+    except:
+        file_pattern = str(path_mosaic_metatada / event_name /mosaic_name) + '*inv.geojson'
+        file_list = glob.glob(f"{file_pattern}")
+        assert len(file_list) == 1, f"Found {len(file_list)} files with pattern {file_pattern}. Expected 1 file."
+        gdf = gpd.read_file(file_list[0])
+        
     minx = sys.maxsize
     miny = sys.maxsize
     maxx = 0
@@ -54,7 +61,6 @@ def get_mosaic_bbox(event_name, mosaic_name, path_mosaic_metatada = './metadata/
         return ((bott_left_lon, bott_left_lat), (top_right_lon, top_right_lat)), gdf['proj:epsg'].values[0]
     
     return ((minx, miny), (maxx, maxy)), gdf['proj:epsg'].values[0]
-
 
 def get_event_bbox(event_name, extra_mt = 0, when = None, return_proj_coords = False):
     

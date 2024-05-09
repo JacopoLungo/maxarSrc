@@ -112,7 +112,7 @@ def count_tif_files(path):
             if file.endswith(".tif"):
                 count += 1
     return count
-    
+
 def compute_stats_on_event(event_id, root = '/nfs/projects/overwatch/maxar-segmentation/maxar-open-data/'):
     """
     Params:

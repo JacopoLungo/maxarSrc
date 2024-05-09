@@ -105,10 +105,14 @@ class Mosaic:
         self.build_gdf = gen_gdf.qk_building_gdf(qk_hits, csv_path = self.event.buildings_ds_links_path)
 
         if len(self.build_gdf) == 0: #here use google buildings
-            self.build_gdf = gen_gdf.google_building_gdf(event_name=self.event.name, bbox=self.bbox)
-            if len(self.build_gdf) == 0:
-                self.build_gdf = None
-                self.proj_build_gdf = None
+            try:
+                self.build_gdf = gen_gdf.google_building_gdf(event_name=self.event.name, bbox=self.bbox)
+                if len(self.build_gdf) == 0:
+                    self.build_gdf = None
+                    self.proj_build_gdf = None
+                    print('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
+                    return False
+            except Exception as e:
                 print('No buildings found for this mosaic either in Ms Buildings or in Google Open Buildings')
                 return False
                 
@@ -615,7 +619,7 @@ class Event:
         self.bbox = delimiters.get_event_bbox(self.name, extra_mt=1000) #TODO può essere ottimizzata sfruttando i mosaici
         self.all_mosaics_names = names.get_mosaics_names(self.name, self.maxar_root, self.when)
         
-        self.wlb_gdf = gpd.read_file('./metadata/eventi_confini.gpkg')
+        self.wlb_gdf = gpd.read_file('./metadata/eventi_confini_complete.gpkg')
         self.filtered_wlb_gdf = self.wlb_gdf[self.wlb_gdf['event names'] == self.name]
         if self.filtered_wlb_gdf.iloc[0].geometry is None:
             print('Evento interamente su terra')

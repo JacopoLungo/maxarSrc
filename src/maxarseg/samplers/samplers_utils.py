@@ -10,6 +10,8 @@ from shapely.geometry.polygon import Polygon
 from shapely import geometry
 import rasterio
 import pandas as pd
+import glob
+
 #from maxarseg import segment
 
 def path_2_tile_aoi(tile_path, root = './metadata/from_github_maxar_metadata/datasets' ):
@@ -27,9 +29,20 @@ def path_2_tile_aoi(tile_path, root = './metadata/from_github_maxar_metadata/dat
         tile = tile_path.parts[-1].replace(".tif", "")
     else:
         raise TypeError("tile_path must be a string or a Path object")
-    path_2_child_geojson = os.path.join(root, event, child +'.geojson')
-    with open(path_2_child_geojson, 'r') as f:
-        child_geojson = json.load(f)
+    
+    try:
+        path_2_child_geojson = os.path.join(root, event, child +'.geojson')
+        with open(path_2_child_geojson, 'r') as f:
+            child_geojson = json.load(f)
+    except:
+        file_pattern = str(os.path.join(root, event, child + '*inv.geojson'))
+        file_list = glob.glob(f"{file_pattern}")
+        assert len(file_list) == 1, f"Found {len(file_list)} files with pattern {file_pattern}. Expected 1 file."
+        path_2_child_geojson = file_list[0]
+        with open(path_2_child_geojson, 'r') as f:
+            child_geojson = json.load(f)
+    
+    
     j = [el["properties"]["proj:geometry"] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
     tile_polyg = shapely.geometry.shape(j)
     return tile_polyg
@@ -49,9 +62,18 @@ def path_2_tile_aoi_no_water(tile_path, land_gdf = None, root = './metadata/from
         tile = tile_path.parts[-1].replace(".tif", "")
     else:
         raise TypeError("tile_path must be a string or a Path object")
-    path_2_child_geojson = os.path.join(root, event, child +'.geojson')
-    with open(path_2_child_geojson, 'r') as f:
-        child_geojson = json.load(f)
+    
+    try:
+        path_2_child_geojson = os.path.join(root, event, child +'.geojson')
+        with open(path_2_child_geojson, 'r') as f:
+            child_geojson = json.load(f)
+    except:
+        file_pattern = str(os.path.join(root, event, child + '*inv.geojson'))
+        file_list = glob.glob(f"{file_pattern}")
+        assert len(file_list) == 1, f"Found {len(file_list)} files with pattern {file_pattern}. Expected 1 file."
+        path_2_child_geojson = file_list[0]
+        with open(path_2_child_geojson, 'r') as f:
+            child_geojson = json.load(f)
     
     prj_crs = [el['properties']['proj:epsg'] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
     j = [el["geometry"] for el in child_geojson['features'] if el['properties']['quadkey'] == tile][0]
