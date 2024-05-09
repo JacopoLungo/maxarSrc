@@ -609,6 +609,9 @@ class Event:
         #esam
         self.efficient_sam = build_efficient_sam_vitt(os.path.join(self.cfg.get('models/esam/root_path'), 'weights/efficient_sam_vitt.pt')).to(self.cfg.get('models/esam/device'))        
         
+        #gdino
+        #self.gdino = 
+        
         #Paths
         self.maxar_root = Path(maxar_root)
         self.buildings_ds_links_path = Path('./metadata/buildings_dataset_links.csv')
@@ -737,6 +740,26 @@ class Event:
                 mos_count += 1
                 if response == False:
                     print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
+                    self.segmented_tiles += mosaic.tiles_num
+                    continue
+            else:
+                print(f"First image of mosaic {mosaic.name} is not rgb, we assume the whole mosaic is not rgb. Skipping it...")
+                mos_count += 1
+                self.segmented_tiles += mosaic.tiles_num
+                continue
+        
+    def seg_mos_by_keys(self, keys, out_dir_root):
+        mos_count = 1
+        for mos_name in keys:
+            mosaic = self.mosaics[mos_name]
+            if mosaic.is_rgb:
+                print(f"Start segmenting mosaic: {mosaic.name}, ({mos_count}/{len(keys)})")
+                times, response = mosaic.segment_all_tiles(out_dir_root=out_dir_root, time_per_tile=self.time_per_tile)
+                self.time_per_tile.extend(times)
+                mos_count += 1
+                if response == False:
+                    print(f'Buildings footprint not available for mosaic: {mosaic.name}. Proceeding to next mosaic...')
+                    self.segmented_tiles += mosaic.tiles_num
                     continue
             else:
                 print(f"First image of mosaic {mosaic.name} is not rgb, we assume the whole mosaic is not rgb. Skipping it...")
