@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --job-name=maxar.3g
+#SBATCH --gres=gpu:3g.40gb:1
+#SBATCH -p A100
+#SBATCH --time=168:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH -o logs/%j_slurm_logs/output.log
+#SBATCH -e logs/%j_slurm_logs/error.log
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=telegram:378097923
+#SBATCH --mem=100G
+
+
+source .venv/bin/activate
+python -B -O -m maxarseg.main_seg_event_w_config_partitioned \
+        --out_dir_root "./output/04_05" \
+        --config "./configs/trees_cfg.yaml" \
+        --event_ix 4.$1

@@ -1,0 +1,24 @@
+srun --job-name=tunnel --gres=gpu:1g.20gb:1 -p A100 --cpus-per-task=8 --time=168:00:00 --pty code tunnel
+srun --job-name=tunnel --gres=gpu:1 -p RTX --cpus-per-task=8 --time=168:00:00 --pty code tunnel
+scontrol show node | grep AllocTRES
+
+
+srun --job-name=maxarseg --gres=gpu:1g.20gb:1 -p A100 --cpus-per-task=10 python -B -O -m maxarseg.main_seg_event_w_config_partitioned \
+        --out_dir_root "./output/04_05" \
+        --config "./configs/trees_cfg.yaml" \
+        --event_ix 4.4
+
+srun --job-name=maxarseg --gres=gpu:3g.40gb:1 -p A100 --cpus-per-task=10 python -B -O -m maxarseg.main_seg_event_w_config \
+        --out_dir_root "./output/tiff/test"\
+        --config "./configs/custom_cfg.yaml" \
+        --event_ix 20
+
+srun --job-name=maxarseg --gres=gpu:1 -p A100 --cpus-per-task=10 python -B -O -m maxarseg.main_seg_event_w_config \
+        --out_dir_root "./output/tiff/test"\
+        --config "./configs/custom_cfg.yaml" \
+        --event_ix 20
+
+srun --job-name=maxarseg --gres=gpu:1 -p RTX --cpus-per-task=8 python -B -O -m maxarseg.main_seg_event_w_config \
+        --out_dir_root "./output/tiff/test" \
+        --config "./configs/custom_cfg.yaml" \
+        --event_ix 20
