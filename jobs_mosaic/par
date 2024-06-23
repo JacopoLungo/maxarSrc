@@ -5,7 +5,7 @@ do
   $scommand
 done
 
-for n in {0..6}
+for n in {2..9}
 do
   scommand="sbatch -J maxar_$n jobs_mosaic/3g $n"
   echo "submit command: $scommand"
@@ -13,7 +13,7 @@ do
 done
 
 
-for n in {19215..19225}
+for n in {19443..19450}
 do
   scommand="scancel $n"
   echo "submit command: $scommand"

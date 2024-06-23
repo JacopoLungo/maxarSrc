@@ -7,12 +7,12 @@
 #SBATCH -o logs/%j_slurm_logs/output.log
 #SBATCH -e logs/%j_slurm_logs/error.log
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=telegram:378097923
+#SBATCH --mail-user=jacopo.lungo@linksfoundation.com
 #SBATCH --mem=100G
 
 
 source .venv/bin/activate
 python -B -O -m maxarseg.main_seg_event_w_config_partitioned \
-        --out_dir_root "./output/04_05" \
+        --out_dir_root "./output/morocco_09_05_2024" \
         --config "./configs/trees_cfg.yaml" \
-        --event_ix 4.$1
+        --event_ix 13.$1
