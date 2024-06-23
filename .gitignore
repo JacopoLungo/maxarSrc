@@ -169,7 +169,42 @@ scalene/
 
 #user dependent jobs
 j_jobs/
+jobs_mosaic/
+jobs/
 
 #test files
 notebooks/to_delete.ipynb
 src/maxarseg/geo_datasets/datasets.py
+
+*.geojson
+
+#shape files
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qix
+*.qmd
+*.sbn
+*.sbx
+*.xml
+*.lock
+
+#geopacakge files
+*.gpkg
+
+*.csv
+*.npy
+*.tif
+*.parquet
+*.paquet
+
+stats/
+labelled/
+notebooks/
+
+morocco_builds/
+
+#recycle bin
+zz_recBin/
