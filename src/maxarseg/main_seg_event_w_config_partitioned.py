@@ -62,7 +62,7 @@ def main():
     all_mosaics_names = event.all_mosaics_names
     all_mosaics_names.sort()
     
-    #There always be 10 partition x.0 to x.9    
+    #There always be 10 partition x.0 to x.9
     mos_ix_s = math.floor(len(all_mosaics_names)/10) * mos_partition
     if mos_partition == 9:
         mos_ix_e = len(all_mosaics_names)
@@ -72,7 +72,9 @@ def main():
     mos_names = all_mosaics_names[mos_ix_s:mos_ix_e]
     
     part_num_tiles = sum([event.mosaics[k].tiles_num for k in mos_names])
+    print()
     print(f'This partition will segment {len(mos_names)}/{len(event.mosaics)} mosaics. {part_num_tiles}/{event.total_tiles} imgs in total')
+    print()
     event.seg_mos_by_keys(keys = mos_names, out_dir_root=cfg.get('output/out_dir_root'))
 
 if __name__ == "__main__":

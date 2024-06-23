@@ -11,6 +11,7 @@ from shapely import geometry
 import rasterio
 import pandas as pd
 import glob
+import scipy
 
 #from maxarseg import segment
 
@@ -236,3 +237,20 @@ def intersection_road_gdf_vs_aois_gdf(proj_road_gdf, aois_gdf):
         intersected_roads = gpd.GeoSeries(pd.concat([valid_gdf, intersected_roads], ignore_index=True))
         
     return intersected_roads
+
+def entropy_from_lbl(lbl):
+    flat_array = lbl.flatten()
+    class_imp = []
+    for i in [0, 1, 2, 255]:
+        class_imp.append(np.sum(flat_array == i))
+    return scipy.stats.entropy(class_imp, base = 2)
+
+def compute_entropy_matrix(img, size = 1024):
+    if len(img.shape) == 3:
+        img = img.squeeze()
+    entropy_matrix = np.zeros((int(img.shape[0]/size), int(img.shape[1]/size)))
+    for i in range(int(img.shape[0]/size)):
+        for j in range(int(img.shape[1]/size)):
+            patch = img[i*size:(i+1)*size, j*size:(j+1)*size]
+            entropy_matrix[i, j] = entropy_from_lbl(patch)
+    return entropy_matrix

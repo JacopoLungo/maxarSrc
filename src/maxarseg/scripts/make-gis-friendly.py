@@ -8,18 +8,22 @@ from https://github.com/microsoft/GlobalMLBuildingFootprints/blob/main/scripts/m
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import shape
+from tqdm import tqdm
 
 def main():
     # this is the name of the geography you want to retrieve. update to meet your needs
-    location = 'TheGambia'
+    location = 'Morocco'
 
-    dataset_links = pd.read_csv("https://minedbuildings.blob.core.windows.net/global-buildings/dataset-links.csv")
+    #dataset_links = pd.read_csv("https://minedbuildings.blob.core.windows.net/global-buildings/dataset-links.csv")
+    #dataset_links = pd.read_csv("/nfs/home/vaschetti/maxarSrc/metadata/buildings_dataset_links.csv")
+    dataset_links = pd.read_csv("/nfs/home/vaschetti/maxarSrc/metadata/buildings_dataset_links_24_05_08.csv")
+    print("/nfs/home/vaschetti/maxarSrc/metadata/buildings_dataset_links_24_05_08.csv")
     greece_links = dataset_links[dataset_links.Location == location]
-    for _, row in greece_links.iterrows():
+    for _, row in tqdm(greece_links.iterrows()):
         df = pd.read_json(row.Url, lines=True)
         df['geometry'] = df['geometry'].apply(shape)
         gdf = gpd.GeoDataFrame(df, crs=4326)
-        gdf.to_file(f"{row.QuadKey}.geojson", driver="GeoJSON")
+        gdf.to_file(f"/nfs/home/vaschetti/maxarSrc/morocco_builds_24_05_08/{row.QuadKey}.geojson", driver="GeoJSON")
     print("Done")
 
 
